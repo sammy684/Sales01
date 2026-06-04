@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>建案分析儀表板</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root{--primary:#1d4ed8;--primary-dark:#1e3a8a;--primary-light:#eff6ff;--bg:#f1f5f9;--surface:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;--green:#059669;--green-bg:#d1fae5;--yellow:#b45309;--yellow-bg:#fef3c7;--red:#dc2626;--red-bg:#fee2e2;--radius:12px}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC','Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    header{background:linear-gradient(135deg,#1d4ed8,#1e3a8a);color:#fff;padding:24px 40px;display:flex;align-items:center;gap:16px}
+    header .logo{font-size:32px}
+    header h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
+    header p{font-size:13px;opacity:.75;margin-top:3px}
+    main{max-width:1200px;margin:0 auto;padding:24px 20px}
+    /* Upload */
+    .upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+    .upload-card{background:var(--surface);border:2px dashed #cbd5e1;border-radius:var(--radius);padding:24px;text-align:center;cursor:pointer;transition:border-color .2s,box-shadow .2s}
+    .upload-card:hover{border-color:var(--primary);box-shadow:0 0 0 4px #dbeafe}
+    .upload-card.done{border-color:var(--green);border-style:solid}
+    .upload-card .icon{font-size:36px;margin-bottom:8px}
+    .upload-card h3{font-size:14px;font-weight:700;margin-bottom:4px}
+    .upload-card .desc{font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5}
+    .pick-btn{display:inline-block;padding:7px 18px;background:var(--primary);color:#fff;border-radius:8px;font-size:12px;font-weight:600;pointer-events:none}
+    input[type="file"]{display:none}
+    .file-list{margin-top:10px;text-align:left}
+    .file-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--green);padding:2px 0}
+    .file-item span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    /* Calc */
+    .calc-btn{width:100%;padding:14px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius);font-size:15px;font-weight:700;cursor:pointer;transition:background .2s,transform .1s;margin-bottom:24px}
+    .calc-btn:hover:not(:disabled){background:var(--primary-dark);transform:translateY(-1px)}
+    .calc-btn:active:not(:disabled){transform:translateY(0)}
+    .calc-btn:disabled{background:#94a3b8;cursor:not-allowed}
+    /* Feature tabs */
+    .feat-tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:20px}
+    .feat-btn{padding:12px 28px;border:none;background:none;font-size:15px;font-weight:600;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .18s}
+    .feat-btn.active{color:var(--primary);border-bottom-color:var(--primary)}
+    .feat-btn:hover:not(.active){color:var(--text)}
+    #results{display:none}
+    /* Stats */
+    .stats-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+    .stat-card{background:var(--surface);border-radius:var(--radius);padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,.07);text-align:center}
+    .stat-card .s-label{font-size:11px;color:var(--muted);font-weight:500;margin-bottom:5px}
+    .stat-card .s-val{font-size:26px;font-weight:800;color:var(--primary);line-height:1}
+    /* Dim tabs */
+    .dim-tabs{display:flex;gap:6px;background:#e2e8f0;padding:5px;border-radius:10px;width:fit-content}
+    .dim-btn{padding:8px 24px;border:none;background:transparent;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);transition:all .18s}
+    .dim-btn.active{background:var(--surface);color:var(--primary);box-shadow:0 2px 6px rgba(0,0,0,.1)}
+    /* Toolbar */
+    .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+    .search-box{padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:200px;outline:none;transition:border-color .15s}
+    .search-box:focus{border-color:var(--primary)}
+    .row-count{font-size:12px;color:var(--muted)}
+    .tool-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--muted)}
+    .tool-btn:hover{background:#f8fafc}
+    /* Table */
+    .table-wrap{background:var(--surface);border-radius:var(--radius);box-shadow:0 1px 4px rgba(0,0,0,.08);overflow-x:auto}
+    table{width:100%;border-collapse:collapse;min-width:600px}
+    thead th{background:#f8fafc;padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
+    thead th:not(:first-child){text-align:right}
+    td{padding:9px 12px;font-size:13px;border-bottom:1px solid #f1f5f9}
+    td:not(:first-child){text-align:right}
+    tr:last-child td{border-bottom:none}
+    /* Row types */
+    .r-total td{font-weight:800;font-size:14px;background:var(--primary-light);color:var(--primary-dark)}
+    .r-lv0{cursor:pointer;transition:background .15s}
+    .r-lv0:hover td{background:#f8fafc}
+    .r-lv0 td{font-weight:700}
+    .r-lv0.open .toggle{transform:rotate(90deg);background:#bfdbfe}
+    .r-lv1{transition:background .1s}
+    .r-lv1.hidden{display:none}
+    .r-lv1 td{font-weight:500}
+    .r-lv1 td:first-child{padding-left:26px}
+    .r-lv1.expandable{cursor:pointer}
+    .r-lv1.expandable:hover td{background:#fafafa}
+    .r-lv1.open .toggle{transform:rotate(90deg);background:#bfdbfe}
+    .r-lv2{transition:background .1s}
+    .r-lv2.hidden{display:none}
+    .r-lv2 td{color:var(--muted);font-size:12px}
+    .r-lv2 td:first-child{padding-left:50px}
+    .r-lv2:hover td{background:#fafafa}
+    .toggle{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;background:#e0e7ff;color:var(--primary);font-size:9px;margin-right:7px;transition:background .15s,transform .2s;vertical-align:middle;flex-shrink:0}
+    /* Badges */
+    .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700}
+    .badge-high{background:var(--green-bg);color:var(--green)}
+    .badge-mid{background:var(--yellow-bg);color:var(--yellow)}
+    .badge-low{background:var(--red-bg);color:var(--red)}
+    .badge-none{color:#9ca3af;font-size:12px}
+    .bar-wrap{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+    .bar-bg{width:70px;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;flex-shrink:0}
+    .bar-fill{height:100%;border-radius:3px}
+    .bar-high{background:var(--green)}.bar-mid{background:#f59e0b}.bar-low{background:var(--red)}
+    /* Clickable */
+    .num-link{cursor:pointer;color:var(--primary);font-weight:700;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
+    .num-link:hover{color:var(--primary-dark);text-decoration-style:solid}
+    .rev-link{cursor:pointer;color:var(--text);font-weight:500;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
+    .rev-link:hover{color:var(--primary)}
+    .num-zero{color:#9ca3af}
+    /* Growth */
+    .g-pos{color:var(--green);font-weight:700}
+    .g-neg{color:var(--red);font-weight:700}
+    .g-na{color:#9ca3af}
+    /* Error */
+    .error-box{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:12px 16px;color:var(--red);font-size:13px;margin-bottom:14px}
+    /* Modal */
+    #modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
+    #modal-overlay.open{display:flex}
+    #modal-box{background:var(--surface);border-radius:16px;width:540px;max-width:92vw;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:pop .18s ease}
+    @keyframes pop{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+    #modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 0;flex-shrink:0}
+    #modal-title{font-size:15px;font-weight:700;flex:1;padding-right:10px}
+    #modal-close{width:30px;height:30px;border:none;background:#f1f5f9;border-radius:8px;font-size:15px;cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center}
+    #modal-close:hover{background:#e2e8f0}
+    #modal-sub{padding:4px 22px 0;font-size:11px;color:var(--muted);flex-shrink:0}
+    #modal-search-wrap{padding:10px 22px;flex-shrink:0}
+    #modal-search{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none}
+    #modal-search:focus{border-color:var(--primary)}
+    #modal-list{overflow-y:auto;flex:1;padding:0 22px 6px}
+    .mod-item{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;font-size:13px}
+    .mod-item:nth-child(odd){background:#f8fafc}
+    .mod-idx{min-width:26px;font-size:10px;font-weight:700;color:var(--muted);text-align:right;flex-shrink:0}
+    .mod-name{flex:1}
+    .mod-rev-val{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;min-width:90px;text-align:right;flex-shrink:0}
+    .mod-empty{text-align:center;color:var(--muted);padding:24px 0;font-size:13px}
+    .mod-total-row{display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--border);font-weight:700;font-size:13px;color:var(--text);margin-top:4px}
+    #modal-footer{padding:8px 22px 14px;flex-shrink:0;font-size:11px;color:var(--muted);text-align:center}
+    @media(max-width:640px){.upload-grid{grid-template-columns:1fr}.stats-bar{grid-template-columns:1fr}header{padding:20px}}
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">🏗️</div>
+  <div>
+    <h1>建案分析儀表板</h1>
+    <p>滲透率分析 &amp; 客單價成長率 ｜ 業務維度 × 縣市維度 ｜ 點擊數字查看明細</p>
+  </div>
+</header>
+<main>
+  <div class="upload-grid">
+    <div class="upload-card" id="card-raw" onclick="document.getElementById('inp-raw').click()">
+      <div class="icon">📊</div><h3>RAW 業績報表 2026</h3>
+      <p class="desc">上傳「RAW業績報表_2026_已簽約業績_MMDD.xlsx」<br>滲透率 + 客單價皆使用</p>
+      <div class="pick-btn">選擇檔案</div>
+      <input type="file" id="inp-raw" accept=".xlsx,.xls" onchange="onRaw(this)">
+      <div class="file-list" id="lst-raw"></div>
+    </div>
+    <div class="upload-card" id="card-online" onclick="document.getElementById('inp-online').click()">
+      <div class="icon">🏢</div><h3>在線建案數（滲透率專用）</h3>
+      <p class="desc">可上傳多份月份檔（可多選）<br>僅滲透率需要，可選擇性上傳</p>
+      <div class="pick-btn">選擇檔案（可多選）</div>
+      <input type="file" id="inp-online" accept=".xlsx,.xls" multiple onchange="onOnline(this)">
+      <div class="file-list" id="lst-online"></div>
+    </div>
+  </div>
+  <button class="calc-btn" id="calc-btn" onclick="doCalc()" disabled>▶ 計算分析</button>
+  <div id="error-area"></div>
+  <div id="results">
+    <div class="feat-tabs">
+      <button class="feat-btn active" id="fb-pen" onclick="switchFeature('pen')">🔍 滲透率</button>
+      <button class="feat-btn" id="fb-unit" onclick="switchFeature('unit')">💰 客單價成長率</button>
+    </div>
+    <!-- 滲透率 -->
+    <div id="sec-pen">
+      <div class="stats-bar">
+        <div class="stat-card"><div class="s-label">合作建案數</div><div class="s-val" id="s-coop">-</div></div>
+        <div class="stat-card"><div class="s-label">在線建案數（全台）</div><div class="s-val" id="s-online">-</div></div>
+        <div class="stat-card"><div class="s-label">整體滲透率</div><div class="s-val" id="s-rate">-</div></div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+        <div class="dim-tabs">
+          <button class="dim-btn active" id="tab-pen-ag" onclick="switchPenDim('ag')">📋 業務維度</button>
+          <button class="dim-btn" id="tab-pen-cn" onclick="switchPenDim('cn')">🗺️ 縣市維度</button>
+        </div>
+        <div style="flex:1"></div>
+        <input class="search-box" id="pen-search" type="text" placeholder="🔍 搜尋…" oninput="onPenSearch(this.value)">
+      </div>
+      <div class="toolbar">
+        <span class="row-count" id="pen-count"></span>
+        <div style="display:flex;gap:6px">
+          <button class="tool-btn" onclick="penExpandAll()">全部展開</button>
+          <button class="tool-btn" onclick="penCollapseAll()">全部摺疊</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div id="view-pen-ag"></div>
+        <div id="view-pen-cn" style="display:none"></div>
+      </div>
+    </div>
+    <!-- 客單價 -->
+    <div id="sec-unit" style="display:none">
+      <div class="stats-bar">
+        <div class="stat-card"><div class="s-label">2025 整體客單價</div><div class="s-val" id="u-p25">-</div></div>
+        <div class="stat-card"><div class="s-label">2026 整體客單價</div><div class="s-val" id="u-p26">-</div></div>
+        <div class="stat-card"><div class="s-label">整體成長率</div><div class="s-val" id="u-growth">-</div></div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+        <div class="dim-tabs">
+          <button class="dim-btn active" id="tab-unit-ag" onclick="switchUnitDim('ag')">📋 業務維度</button>
+          <button class="dim-btn" id="tab-unit-cn" onclick="switchUnitDim('cn')">🗺️ 縣市維度</button>
+        </div>
+        <div style="flex:1"></div>
+        <input class="search-box" id="unit-search" type="text" placeholder="🔍 搜尋…" oninput="onUnitSearch(this.value)">
+      </div>
+      <div class="toolbar">
+        <span class="row-count" id="unit-count"></span>
+        <div style="display:flex;gap:6px">
+          <button class="tool-btn" onclick="unitExpandAll()">全部展開</button>
+          <button class="tool-btn" onclick="unitCollapseAll()">全部摺疊</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div id="view-unit-ag"></div>
+        <div id="view-unit-cn" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+</main>
+<!-- Modal -->
+<div id="modal-overlay" onclick="closeModal()">
+  <div id="modal-box" onclick="event.stopPropagation()">
+    <div id="modal-head">
+      <div id="modal-title"></div>
+      <button id="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-sub"></div>
+    <div id="modal-search-wrap">
+      <input id="modal-search" type="text" placeholder="🔍 搜尋建案名稱…" oninput="filterModal(this.value)">
+    </div>
+    <div id="modal-list"></div>
+    <div id="modal-footer"></div>
+  </div>
+</div>
+<script>
+// ══ Pre-embedded 2025 data ══
+const DATA_2025={"total":{"n":1819,"rev":393745008},"teams":{"業務三組":{"n":468,"rev":90702405},"業務二組":{"n":383,"rev":107766708},"業務四組":{"n":522,"rev":81292440},"業務一組":{"n":426,"rev":112189046},"業務五組":{"n":55,"rev":1794409},"行政組":{"n":2,"rev":0}},"agents":{"呂佩宜":{"team":"業務三組","n":189,"rev":30492048,"districts":{"台中市|":{"n":1,"rev":22247,"county":"台中市","district":""},"台中市|沙鹿區":{"n":29,"rev":7248799,"county":"台中市","district":"沙鹿區"},"彰化縣|花壇鄉":{"n":1,"rev":155318,"county":"彰化縣","district":"花壇鄉"},"雲林縣|斗六市":{"n":12,"rev":849006,"county":"雲林縣","district":"斗六市"},"雲林縣|二崙鄉":{"n":2,"rev":89960,"county":"雲林縣","district":"二崙鄉"},"彰化縣|二林鎮":{"n":1,"rev":8791,"county":"彰化縣","district":"二林鎮"},"台中市|梧棲區":{"n":20,"rev":4474286,"county":"台中市","district":"梧棲區"},"台中市|南屯區":{"n":16,"rev":5284515,"county":"台中市","district":"南屯區"},"雲林縣|土庫鎮":{"n":5,"rev":156355,"county":"雲林縣","district":"土庫鎮"},"雲林縣|西螺鎮":{"n":4,"rev":100506,"county":"雲林縣","district":"西螺鎮"},"彰化縣|北斗鎮":{"n":4,"rev":88325,"county":"彰化縣","district":"北斗鎮"},"彰化縣|永靖鄉":{"n":3,"rev":80951,"county":"彰化縣","district":"永靖鄉"},"雲林縣|斗南鎮":{"n":10,"rev":581655,"county":"雲林縣","district":"斗南鎮"},"彰化縣|社頭鄉":{"n":8,"rev":515260,"county":"彰化縣","district":"社頭鄉"},"彰化縣|彰化市":{"n":4,"rev":1083141,"county":"彰化縣","district":"彰化市"},"雲林縣|古坑鄉":{"n":1,"rev":38256,"county":"雲林縣","district":"古坑鄉"},"台中市|西屯區":{"n":3,"rev":1070476,"county":"台中市","district":"西屯區"},"台中市|清水區":{"n":4,"rev":1826416,"county":"台中市","district":"清水區"},"彰化縣|溪湖鎮":{"n":12,"rev":203832,"county":"彰化縣","district":"溪湖鎮"},"台中市|烏日區":{"n":5,"rev":1762765,"county":"台中市","district":"烏日區"},"雲林縣|虎尾鎮":{"n":9,"rev":411801,"county":"雲林縣","district":"虎尾鎮"},"台中市|北屯區":{"n":3,"rev":250400,"county":"台中市","district":"北屯區"},"彰化縣|溪州鄉":{"n":4,"rev":198537,"county":"彰化縣","district":"溪州鄉"},"台中市|潭子區":{"n":1,"rev":201600,"county":"台中市","district":"潭子區"},"雲林縣|北港鎮":{"n":2,"rev":71060,"county":"雲林縣","district":"北港鎮"},"南投縣|草屯鎮":{"n":1,"rev":211788,"county":"南投縣","district":"草屯鎮"},"台中市|南區":{"n":1,"rev":314465,"county":"台中市","district":"南區"},"台中市|東區":{"n":1,"rev":100800,"county":"台中市","district":"東區"},"彰化縣|田中鎮":{"n":3,"rev":212382,"county":"彰化縣","district":"田中鎮"},"台中市|大里區":{"n":10,"rev":1863471,"county":"台中市","district":"大里區"},"雲林縣|莿桐鄉":{"n":1,"rev":68719,"county":"雲林縣","district":"莿桐鄉"},"台中市|后里區":{"n":7,"rev":789063,"county":"台中市","district":"后里區"},"台中市|北區":{"n":2,"rev":102102,"county":"台中市","district":"北區"},"台中市|霧峰區":{"n":1,"rev":55000,"county":"台中市","district":"霧峰區"}}},"曾方音":{"team":"業務二組","n":129,"rev":56380213,"districts":{"新北市|林口區":{"n":26,"rev":15723932,"county":"新北市","district":"林口區"},"宜蘭縣|五結鄉":{"n":1,"rev":17187,"county":"宜蘭縣","district":"五結鄉"},"桃園市|觀音區":{"n":15,"rev":1855972,"county":"桃園市","district":"觀音區"},"新竹縣|關西鎮":{"n":1,"rev":26048,"county":"新竹縣","district":"關西鎮"},"新北市|三重區":{"n":23,"rev":17390985,"county":"新北市","district":"三重區"},"台北市|松山區":{"n":8,"rev":3210166,"county":"台北市","district":"松山區"},"宜蘭縣|宜蘭市":{"n":1,"rev":310266,"county":"宜蘭縣","district":"宜蘭市"},"桃園市|大園區":{"n":24,"rev":5343667,"county":"桃園市","district":"大園區"},"新北市|五股區":{"n":10,"rev":6217588,"county":"新北市","district":"五股區"},"新竹縣|竹北市":{"n":1,"rev":20115,"county":"新竹縣","district":"竹北市"},"新北市|蘆洲區":{"n":1,"rev":431435,"county":"新北市","district":"蘆洲區"},"台北市|大同區":{"n":11,"rev":4333442,"county":"台北市","district":"大同區"},"新北市|樹林區":{"n":2,"rev":740868,"county":"新北市","district":"樹林區"},"新竹縣|橫山鄉":{"n":1,"rev":17000,"county":"新竹縣","district":"橫山鄉"},"新北市|鶯歌區":{"n":3,"rev":693333,"county":"新北市","district":"鶯歌區"},"桃園市|龍潭區":{"n":1,"rev":48209,"county":"桃園市","district":"龍潭區"}}},"簡順隆":{"team":"業務二組","n":154,"rev":38657305,"districts":{"桃園市|中壢區":{"n":37,"rev":9023941,"county":"桃園市","district":"中壢區"},"台北市|文山區":{"n":9,"rev":6086145,"county":"台北市","district":"文山區"},"桃園市|新屋區":{"n":22,"rev":2136203,"county":"桃園市","district":"新屋區"},"宜蘭縣|礁溪鄉":{"n":5,"rev":226637,"county":"宜蘭縣","district":"礁溪鄉"},"台北市|中山區":{"n":19,"rev":4410662,"county":"台北市","district":"中山區"},"新竹縣|竹北市":{"n":3,"rev":205762,"county":"新竹縣","district":"竹北市"},"宜蘭縣|宜蘭市":{"n":2,"rev":22000,"county":"宜蘭縣","district":"宜蘭市"},"宜蘭縣|冬山鄉":{"n":1,"rev":26258,"county":"宜蘭縣","district":"冬山鄉"},"新竹縣|新豐鄉":{"n":1,"rev":6071,"county":"新竹縣","district":"新豐鄉"},"宜蘭縣|蘇澳鎮":{"n":1,"rev":185209,"county":"宜蘭縣","district":"蘇澳鎮"},"新北市|板橋區":{"n":19,"rev":8672667,"county":"新北市","district":"板橋區"},"台北市|萬華區":{"n":10,"rev":2227451,"county":"台北市","district":"萬華區"},"宜蘭縣|員山鄉":{"n":2,"rev":36000,"county":"宜蘭縣","district":"員山鄉"},"台北市|中正區":{"n":10,"rev":1813082,"county":"台北市","district":"中正區"},"新北市|土城區":{"n":11,"rev":3097890,"county":"新北市","district":"土城區"},"宜蘭縣|五結鄉":{"n":1,"rev":95238,"county":"宜蘭縣","district":"五結鄉"},"宜蘭縣|頭城鎮":{"n":1,"rev":47619,"county":"宜蘭縣","district":"頭城鎮"},"桃園市|楊梅區":{"n":1,"rev":49028,"county":"桃園市","district":"楊梅區"},"桃園市|桃園區":{"n":1,"rev":48178,"county":"桃園市","district":"桃園區"},"桃園市|八德區":{"n":2,"rev":201264,"county":"桃園市","district":"八德區"},"桃園市|平鎮區":{"n":1,"rev":40000,"county":"桃園市","district":"平鎮區"}}},"簡艷華":{"team":"業務四組","n":145,"rev":25337462,"districts":{"高雄市|左營區":{"n":18,"rev":6700725,"county":"高雄市","district":"左營區"},"高雄市|鳳山區":{"n":20,"rev":4230650,"county":"高雄市","district":"鳳山區"},"屏東縣|九如鄉":{"n":1,"rev":6676,"county":"屏東縣","district":"九如鄉"},"屏東縣|內埔鄉":{"n":15,"rev":904290,"county":"屏東縣","district":"內埔鄉"},"高雄市|仁武區":{"n":22,"rev":4101061,"county":"高雄市","district":"仁武區"},"高雄市|楠梓區":{"n":24,"rev":5900922,"county":"高雄市","district":"楠梓區"},"屏東縣|麟洛鄉":{"n":1,"rev":62214,"county":"屏東縣","district":"麟洛鄉"},"高雄市|燕巢區":{"n":2,"rev":35435,"county":"高雄市","district":"燕巢區"},"屏東縣|潮州鎮":{"n":11,"rev":546637,"county":"屏東縣","district":"潮州鎮"},"高雄市|鳥松區":{"n":5,"rev":415925,"county":"高雄市","district":"鳥松區"},"高雄市|大社區":{"n":2,"rev":292085,"county":"高雄市","district":"大社區"},"屏東縣|屏東市":{"n":1,"rev":8449,"county":"屏東縣","district":"屏東市"},"高雄市|三民區":{"n":2,"rev":103334,"county":"高雄市","district":"三民區"},"高雄市|橋頭區":{"n":7,"rev":786209,"county":"高雄市","district":"橋頭區"},"台北市|中正區":{"n":1,"rev":51584,"county":"台北市","district":"中正區"},"台南市|永康區":{"n":1,"rev":135476,"county":"台南市","district":"永康區"},"高雄市|路竹區":{"n":1,"rev":190476,"county":"高雄市","district":"路竹區"},"高雄市|岡山區":{"n":2,"rev":47143,"county":"高雄市","district":"岡山區"},"屏東縣|竹田鄉":{"n":1,"rev":56779,"county":"屏東縣","district":"竹田鄉"},"高雄市|梓官區":{"n":1,"rev":20000,"county":"高雄市","district":"梓官區"},"台南市|安平區":{"n":2,"rev":158714,"county":"台南市","district":"安平區"},"台南市|安南區":{"n":6,"rev":552678,"county":"台南市","district":"安南區"},"高雄市|茄萣區":{"n":1,"rev":30000,"county":"高雄市","district":"茄萣區"}}},"鄧瑋婷(房)":{"team":"業務四組","n":202,"rev":26719395,"districts":{"台南市|善化區":{"n":14,"rev":2767383,"county":"台南市","district":"善化區"},"台南市|關廟區":{"n":5,"rev":321255,"county":"台南市","district":"關廟區"},"嘉義市|西區":{"n":10,"rev":1031244,"county":"嘉義市","district":"西區"},"台南市|安南區":{"n":10,"rev":456326,"county":"台南市","district":"安南區"},"台南市|永康區":{"n":27,"rev":5137709,"county":"台南市","district":"永康區"},"台南市|北區":{"n":8,"rev":2210818,"county":"台南市","district":"北區"},"台南市|麻豆區":{"n":6,"rev":635133,"county":"台南市","district":"麻豆區"},"台南市|後壁區":{"n":2,"rev":167560,"county":"台南市","district":"後壁區"},"嘉義縣|六腳鄉":{"n":2,"rev":16513,"county":"嘉義縣","district":"六腳鄉"},"嘉義縣|大林鎮":{"n":3,"rev":22006,"county":"嘉義縣","district":"大林鎮"},"台南市|中西區":{"n":2,"rev":387795,"county":"台南市","district":"中西區"},"台南市|安定區":{"n":10,"rev":1678291,"county":"台南市","district":"安定區"},"台南市|官田區":{"n":3,"rev":781146,"county":"台南市","district":"官田區"},"台南市|六甲區":{"n":2,"rev":444972,"county":"台南市","district":"六甲區"},"台南市|佳里區":{"n":5,"rev":537542,"county":"台南市","district":"佳里區"},"台南市|新化區":{"n":8,"rev":715683,"county":"台南市","district":"新化區"},"嘉義縣|太保市":{"n":4,"rev":168476,"county":"嘉義縣","district":"太保市"},"嘉義縣|新港鄉":{"n":6,"rev":153220,"county":"嘉義縣","district":"新港鄉"},"台南市|新營區":{"n":6,"rev":1637928,"county":"台南市","district":"新營區"},"台南市|新市區":{"n":5,"rev":489243,"county":"台南市","district":"新市區"},"嘉義縣|溪口鄉":{"n":1,"rev":49538,"county":"嘉義縣","district":"溪口鄉"},"台南市|安平區":{"n":2,"rev":175129,"county":"台南市","district":"安平區"},"嘉義縣|民雄鄉":{"n":8,"rev":346004,"county":"嘉義縣","district":"民雄鄉"},"台南市|下營區":{"n":1,"rev":33000,"county":"台南市","district":"下營區"},"台南市|歸仁區":{"n":8,"rev":1118275,"county":"台南市","district":"歸仁區"},"嘉義縣|中埔鄉":{"n":2,"rev":69206,"county":"嘉義縣","district":"中埔鄉"},"嘉義縣|梅山鄉":{"n":2,"rev":93569,"county":"嘉義縣","district":"梅山鄉"},"嘉義縣|水上鄉":{"n":1,"rev":90204,"county":"嘉義縣","district":"水上鄉"},"台南市|南區":{"n":8,"rev":702408,"county":"台南市","district":"南區"},"台南市|山上區":{"n":1,"rev":341290,"county":"台南市","district":"山上區"},"台南市|西港區":{"n":5,"rev":375180,"county":"台南市","district":"西港區"},"台北市|中正區":{"n":1,"rev":66092,"county":"台北市","district":"中正區"},"台南市|學甲區":{"n":1,"rev":24000,"county":"台南市","district":"學甲區"},"台南市|東區":{"n":8,"rev":1623058,"county":"台南市","district":"東區"},"台南市|鹽水區":{"n":2,"rev":112476,"county":"台南市","district":"鹽水區"},"台南市|仁德區":{"n":5,"rev":1239843,"county":"台南市","district":"仁德區"},"嘉義市|東區":{"n":4,"rev":219562,"county":"嘉義市","district":"東區"},"台南市|七股區":{"n":1,"rev":12000,"county":"台南市","district":"七股區"},"台南市|將軍區":{"n":1,"rev":180952,"county":"台南市","district":"將軍區"},"高雄市|左營區":{"n":2,"rev":87366,"county":"高雄市","district":"左營區"}}},"曾家羚":{"team":"業務三組","n":153,"rev":31576437,"districts":{"台中市|北屯區":{"n":45,"rev":11403137,"county":"台中市","district":"北屯區"},"台中市|大甲區":{"n":1,"rev":619131,"county":"台中市","district":"大甲區"},"台中市|沙鹿區":{"n":1,"rev":302904,"county":"台中市","district":"沙鹿區"},"台中市|南區":{"n":14,"rev":5525487,"county":"台中市","district":"南區"},"台中市|南屯區":{"n":7,"rev":1746687,"county":"台中市","district":"南屯區"},"彰化縣|伸港鄉":{"n":6,"rev":406537,"county":"彰化縣","district":"伸港鄉"},"台中市|豐原區":{"n":3,"rev":787069,"county":"台中市","district":"豐原區"},"台中市|西屯區":{"n":5,"rev":2151548,"county":"台中市","district":"西屯區"},"彰化縣|和美鎮":{"n":8,"rev":802513,"county":"彰化縣","district":"和美鎮"},"台中市|清水區":{"n":7,"rev":1086612,"county":"台中市","district":"清水區"},"彰化縣|北斗鎮":{"n":1,"rev":16304,"county":"彰化縣","district":"北斗鎮"},"彰化縣|田中鎮":{"n":1,"rev":99209,"county":"彰化縣","district":"田中鎮"},"南投縣|集集鎮":{"n":2,"rev":84568,"county":"南投縣","district":"集集鎮"},"彰化縣|芳苑鄉":{"n":1,"rev":93531,"county":"彰化縣","district":"芳苑鄉"},"南投縣|南投市":{"n":15,"rev":927858,"county":"南投縣","district":"南投市"},"台中市|龍井區":{"n":10,"rev":2041558,"county":"台中市","district":"龍井區"},"彰化縣|二林鎮":{"n":1,"rev":103354,"county":"彰化縣","district":"二林鎮"},"彰化縣|員林市":{"n":1,"rev":513317,"county":"彰化縣","district":"員林市"},"台中市|太平區":{"n":1,"rev":566969,"county":"台中市","district":"太平區"},"彰化縣|大村鄉":{"n":1,"rev":85545,"county":"彰化縣","district":"大村鄉"},"彰化縣|埔鹽鄉":{"n":2,"rev":70790,"county":"彰化縣","district":"埔鹽鄉"},"彰化縣|永靖鄉":{"n":1,"rev":68810,"county":"彰化縣","district":"永靖鄉"},"彰化縣|鹿港鎮":{"n":4,"rev":620748,"county":"彰化縣","district":"鹿港鎮"},"彰化縣|福興鄉":{"n":1,"rev":28571,"county":"彰化縣","district":"福興鄉"},"台中市|大肚區":{"n":5,"rev":923362,"county":"台中市","district":"大肚區"},"彰化縣|花壇鄉":{"n":2,"rev":217518,"county":"彰化縣","district":"花壇鄉"},"南投縣|竹山鎮":{"n":3,"rev":57769,"county":"南投縣","district":"竹山鎮"},"彰化縣|彰化市":{"n":1,"rev":53809,"county":"彰化縣","district":"彰化市"},"南投縣|草屯鎮":{"n":1,"rev":15984,"county":"南投縣","district":"草屯鎮"},"台中市|東勢區":{"n":1,"rev":95238,"county":"台中市","district":"東勢區"},"彰化縣|埔心鄉":{"n":1,"rev":60000,"county":"彰化縣","district":"埔心鄉"}}},"陳琬臻":{"team":"業務三組","n":128,"rev":28633920,"districts":{"彰化縣|花壇鄉":{"n":4,"rev":151714,"county":"彰化縣","district":"花壇鄉"},"台中市|西屯區":{"n":16,"rev":7868078,"county":"台中市","district":"西屯區"},"彰化縣|員林市":{"n":13,"rev":1393393,"county":"彰化縣","district":"員林市"},"台中市|太平區":{"n":10,"rev":3326641,"county":"台中市","district":"太平區"},"南投縣|草屯鎮":{"n":13,"rev":1900619,"county":"南投縣","district":"草屯鎮"},"南投縣|埔里鎮":{"n":8,"rev":523393,"county":"南投縣","district":"埔里鎮"},"台中市|西區":{"n":4,"rev":479323,"county":"台中市","district":"西區"},"彰化縣|埔心鄉":{"n":5,"rev":433441,"county":"彰化縣","district":"埔心鄉"},"台中市|中區":{"n":3,"rev":296247,"county":"台中市","district":"中區"},"台中市|南屯區":{"n":7,"rev":2548610,"county":"台中市","district":"南屯區"},"彰化縣|彰化市":{"n":9,"rev":580414,"county":"彰化縣","district":"彰化市"},"台中市|北屯區":{"n":12,"rev":3730754,"county":"台中市","district":"北屯區"},"台中市|神岡區":{"n":2,"rev":310574,"county":"台中市","district":"神岡區"},"彰化縣|芬園鄉":{"n":1,"rev":47619,"county":"彰化縣","district":"芬園鄉"},"彰化縣|秀水鄉":{"n":2,"rev":96818,"county":"彰化縣","district":"秀水鄉"},"台中市|":{"n":2,"rev":422714,"county":"台中市","district":""},"南投縣|南投市":{"n":1,"rev":20000,"county":"南投縣","district":"南投市"},"台中市|東區":{"n":6,"rev":1497893,"county":"台中市","district":"東區"},"台中市|沙鹿區":{"n":1,"rev":1089951,"county":"台中市","district":"沙鹿區"},"台中市|大甲區":{"n":2,"rev":73600,"county":"台中市","district":"大甲區"},"台中市|大雅區":{"n":3,"rev":441972,"county":"台中市","district":"大雅區"},"台中市|豐原區":{"n":1,"rev":223809,"county":"台中市","district":"豐原區"},"彰化縣|大村鄉":{"n":1,"rev":56190,"county":"彰化縣","district":"大村鄉"},"台中市|潭子區":{"n":2,"rev":1120153,"county":"台中市","district":"潭子區"}}},"趙紹亨":{"team":"業務一組","n":94,"rev":39232213,"districts":{"台北市|北投區":{"n":21,"rev":8492222,"county":"台北市","district":"北投區"},"新北市|永和區":{"n":6,"rev":1403637,"county":"新北市","district":"永和區"},"基隆市|中正區":{"n":3,"rev":635284,"county":"基隆市","district":"中正區"},"基隆市|中山區":{"n":2,"rev":536309,"county":"基隆市","district":"中山區"},"新北市|淡水區":{"n":16,"rev":11422344,"county":"新北市","district":"淡水區"},"新北市|八里區":{"n":4,"rev":849268,"county":"新北市","district":"八里區"},"基隆市|暖暖區":{"n":1,"rev":239311,"county":"基隆市","district":"暖暖區"},"新北市|中和區":{"n":10,"rev":3046358,"county":"新北市","district":"中和區"},"台北市|南港區":{"n":6,"rev":4619879,"county":"台北市","district":"南港區"},"新北市|汐止區":{"n":3,"rev":1314285,"county":"新北市","district":"汐止區"},"台北市|士林區":{"n":9,"rev":2268493,"county":"台北市","district":"士林區"},"新北市|新店區":{"n":9,"rev":3862872,"county":"新北市","district":"新店區"},"基隆市|信義區":{"n":1,"rev":12224,"county":"基隆市","district":"信義區"},"基隆市|安樂區":{"n":1,"rev":188290,"county":"基隆市","district":"安樂區"},"新北市|三峽區":{"n":1,"rev":300000,"county":"新北市","district":"三峽區"},"基隆市|仁愛區":{"n":1,"rev":41437,"county":"基隆市","district":"仁愛區"}}},"彭莉芳":{"team":"業務一組","n":194,"rev":20681413,"districts":{"苗栗縣|竹南鎮":{"n":9,"rev":755235,"county":"苗栗縣","district":"竹南鎮"},"苗栗縣|苗栗市":{"n":10,"rev":307211,"county":"苗栗縣","district":"苗栗市"},"桃園市|楊梅區":{"n":36,"rev":5469842,"county":"桃園市","district":"楊梅區"},"新竹縣|湖口鄉":{"n":28,"rev":2793109,"county":"新竹縣","district":"湖口鄉"},"新竹市|北區":{"n":21,"rev":2347397,"county":"新竹市","district":"北區"},"苗栗縣|公館鄉":{"n":1,"rev":7389,"county":"苗栗縣","district":"公館鄉"},"苗栗縣|苑裡鎮":{"n":3,"rev":28895,"county":"苗栗縣","district":"苑裡鎮"},"苗栗縣|造橋鄉":{"n":1,"rev":26860,"county":"苗栗縣","district":"造橋鄉"},"苗栗縣|頭份市":{"n":23,"rev":1911180,"county":"苗栗縣","district":"頭份市"},"新竹縣|寶山鄉":{"n":3,"rev":393967,"county":"新竹縣","district":"寶山鄉"},"新竹市|東區":{"n":14,"rev":1678944,"county":"新竹市","district":"東區"},"桃園市|平鎮區":{"n":11,"rev":1940938,"county":"桃園市","district":"平鎮區"},"苗栗縣|後龍鎮":{"n":7,"rev":370093,"county":"苗栗縣","district":"後龍鎮"},"新竹市|香山區":{"n":7,"rev":624416,"county":"新竹市","district":"香山區"},"宜蘭縣|員山鄉":{"n":1,"rev":85714,"county":"宜蘭縣","district":"員山鄉"},"苗栗縣|銅鑼鄉":{"n":1,"rev":114286,"county":"苗栗縣","district":"銅鑼鄉"},"桃園市|龍潭區":{"n":13,"rev":1108288,"county":"桃園市","district":"龍潭區"},"桃園市|大溪區":{"n":3,"rev":208572,"county":"桃園市","district":"大溪區"},"新竹縣|新埔鎮":{"n":3,"rev":357854,"county":"新竹縣","district":"新埔鎮"},"台南市|北區":{"n":1,"rev":48840,"county":"台南市","district":"北區"},"高雄市|楠梓區":{"n":1,"rev":95238,"county":"高雄市","district":"楠梓區"},"台中市|西屯區":{"n":1,"rev":7145,"county":"台中市","district":"西屯區"}}},"黃淑萍":{"team":"業務一組","n":88,"rev":26441615,"districts":{"桃園市|桃園區":{"n":41,"rev":15263274,"county":"桃園市","district":"桃園區"},"桃園市|龜山區":{"n":13,"rev":4027279,"county":"桃園市","district":"龜山區"},"新北市|泰山區":{"n":1,"rev":22236,"county":"新北市","district":"泰山區"},"新北市|新莊區":{"n":2,"rev":891794,"county":"新北市","district":"新莊區"},"桃園市|八德區":{"n":12,"rev":3841238,"county":"桃園市","district":"八德區"},"宜蘭縣|五結鄉":{"n":2,"rev":123114,"county":"宜蘭縣","district":"五結鄉"},"宜蘭縣|蘇澳鎮":{"n":1,"rev":110657,"county":"宜蘭縣","district":"蘇澳鎮"},"宜蘭縣|頭城鎮":{"n":1,"rev":6000,"county":"宜蘭縣","district":"頭城鎮"},"宜蘭縣|礁溪鄉":{"n":2,"rev":143477,"county":"宜蘭縣","district":"礁溪鄉"},"桃園市|蘆竹區":{"n":9,"rev":1172736,"county":"桃園市","district":"蘆竹區"},"台北市|信義區":{"n":2,"rev":482381,"county":"台北市","district":"信義區"},"花蓮縣|花蓮市":{"n":2,"rev":80429,"county":"花蓮縣","district":"花蓮市"},"宜蘭縣|宜蘭市":{"n":1,"rev":17000,"county":"宜蘭縣","district":"宜蘭市"},"桃園市|平鎮區":{"n":1,"rev":260000,"county":"桃園市","district":"平鎮區"}}},"姚蘋芸":{"team":"業務四組","n":180,"rev":27554431,"districts":{"高雄市|三民區":{"n":30,"rev":7519004,"county":"高雄市","district":"三民區"},"高雄市|鼓山區":{"n":6,"rev":3079304,"county":"高雄市","district":"鼓山區"},"屏東縣|萬丹鄉":{"n":12,"rev":860553,"county":"屏東縣","district":"萬丹鄉"},"屏東縣|屏東市":{"n":14,"rev":632879,"county":"屏東縣","district":"屏東市"},"高雄市|小港區":{"n":17,"rev":1678617,"county":"高雄市","district":"小港區"},"高雄市|前鎮區":{"n":14,"rev":4236289,"county":"高雄市","district":"前鎮區"},"屏東縣|崁頂鄉":{"n":1,"rev":54718,"county":"屏東縣","district":"崁頂鄉"},"高雄市|大樹區":{"n":6,"rev":664982,"county":"高雄市","district":"大樹區"},"高雄市|前金區":{"n":5,"rev":1359856,"county":"高雄市","district":"前金區"},"屏東縣|長治鄉":{"n":7,"rev":388453,"county":"屏東縣","district":"長治鄉"},"屏東縣|東港鎮":{"n":8,"rev":429621,"county":"屏東縣","district":"東港鎮"},"花蓮縣|花蓮市":{"n":1,"rev":47961,"county":"花蓮縣","district":"花蓮市"},"屏東縣|新園鄉":{"n":6,"rev":482761,"county":"屏東縣","district":"新園鄉"},"高雄市|大寮區":{"n":11,"rev":1387667,"county":"高雄市","district":"大寮區"},"高雄市|林園區":{"n":6,"rev":671741,"county":"高雄市","district":"林園區"},"高雄市|新興區":{"n":3,"rev":337691,"county":"高雄市","district":"新興區"},"高雄市|湖內區":{"n":2,"rev":289407,"county":"高雄市","district":"湖內區"},"高雄市|苓雅區":{"n":5,"rev":1581457,"county":"高雄市","district":"苓雅區"},"屏東縣|南州鄉":{"n":1,"rev":12900,"county":"屏東縣","district":"南州鄉"},"高雄市|彌陀區":{"n":1,"rev":70751,"county":"高雄市","district":"彌陀區"},"高雄市|梓官區":{"n":1,"rev":334057,"county":"高雄市","district":"梓官區"},"屏東縣|新埤鄉":{"n":2,"rev":128660,"county":"屏東縣","district":"新埤鄉"},"屏東縣|竹田鄉":{"n":1,"rev":59180,"county":"屏東縣","district":"竹田鄉"},"屏東縣|九如鄉":{"n":1,"rev":14600,"county":"屏東縣","district":"九如鄉"},"屏東縣|佳冬鄉":{"n":2,"rev":47933,"county":"屏東縣","district":"佳冬鄉"},"高雄市|":{"n":1,"rev":552533,"county":"高雄市","district":""},"屏東縣|萬巒鄉":{"n":1,"rev":57143,"county":"屏東縣","district":"萬巒鄉"},"屏東縣|麟洛鄉":{"n":1,"rev":28804,"county":"屏東縣","district":"麟洛鄉"},"高雄市|鳳山區":{"n":3,"rev":55771,"county":"高雄市","district":"鳳山區"},"高雄市|左營區":{"n":2,"rev":29917,"county":"高雄市","district":"左營區"},"高雄市|楠梓區":{"n":5,"rev":254146,"county":"高雄市","district":"楠梓區"},"高雄市|橋頭區":{"n":2,"rev":22986,"county":"高雄市","district":"橋頭區"},"高雄市|仁武區":{"n":3,"rev":182089,"county":"高雄市","district":"仁武區"}}},"仲綨柱":{"team":"業務一組","n":53,"rev":25833805,"districts":{"台北市|信義區":{"n":5,"rev":2597205,"county":"台北市","district":"信義區"},"台北市|內湖區":{"n":7,"rev":3358825,"county":"台北市","district":"內湖區"},"新北市|新莊區":{"n":19,"rev":11344842,"county":"新北市","district":"新莊區"},"台北市|大安區":{"n":16,"rev":6264135,"county":"台北市","district":"大安區"},"新北市|泰山區":{"n":4,"rev":2249995,"county":"新北市","district":"泰山區"},"宜蘭縣|蘇澳鎮":{"n":1,"rev":8800,"county":"宜蘭縣","district":"蘇澳鎮"},"台中市|西屯區":{"n":1,"rev":10003,"county":"台中市","district":"西屯區"}}},"楊儀菲":{"team":"業務二組","n":113,"rev":11982424,"districts":{"高雄市|鼓山區":{"n":1,"rev":29120,"county":"高雄市","district":"鼓山區"},"新竹縣|竹東鎮":{"n":2,"rev":444164,"county":"新竹縣","district":"竹東鎮"},"新竹縣|竹北市":{"n":14,"rev":1485641,"county":"新竹縣","district":"竹北市"},"苗栗縣|竹南鎮":{"n":27,"rev":2854141,"county":"苗栗縣","district":"竹南鎮"},"新竹縣|新豐鄉":{"n":10,"rev":936447,"county":"新竹縣","district":"新豐鄉"},"苗栗縣|苑裡鎮":{"n":8,"rev":700291,"county":"苗栗縣","district":"苑裡鎮"},"新竹縣|關西鎮":{"n":2,"rev":72960,"county":"新竹縣","district":"關西鎮"},"苗栗縣|公館鄉":{"n":2,"rev":108619,"county":"苗栗縣","district":"公館鄉"},"新竹縣|橫山鄉":{"n":1,"rev":85000,"county":"新竹縣","district":"橫山鄉"},"桃園市|觀音區":{"n":30,"rev":4288289,"county":"桃園市","district":"觀音區"},"新竹縣|芎林鄉":{"n":2,"rev":202857,"county":"新竹縣","district":"芎林鄉"},"苗栗縣|銅鑼鄉":{"n":1,"rev":61905,"county":"苗栗縣","district":"銅鑼鄉"},"桃園市|新屋區":{"n":11,"rev":613171,"county":"桃園市","district":"新屋區"},"新北市|板橋區":{"n":1,"rev":47619,"county":"新北市","district":"板橋區"},"苗栗縣|頭份市":{"n":1,"rev":52200,"county":"苗栗縣","district":"頭份市"}}},"翁嘉妘":{"team":"業務四組","n":15,"rev":1350748,"districts":{"台南市|安南區":{"n":12,"rev":1241735,"county":"台南市","district":"安南區"},"高雄市|燕巢區":{"n":2,"rev":53571,"county":"高雄市","district":"燕巢區"},"高雄市|旗山區":{"n":1,"rev":55442,"county":"高雄市","district":"旗山區"}}},"李抒姮":{"team":"業務五組","n":26,"rev":873426,"districts":{"宜蘭縣|礁溪鄉":{"n":5,"rev":247126,"county":"宜蘭縣","district":"礁溪鄉"},"宜蘭縣|宜蘭市":{"n":4,"rev":155385,"county":"宜蘭縣","district":"宜蘭市"},"宜蘭縣|員山鄉":{"n":5,"rev":129151,"county":"宜蘭縣","district":"員山鄉"},"宜蘭縣|頭城鎮":{"n":1,"rev":14800,"county":"宜蘭縣","district":"頭城鎮"},"宜蘭縣|三星鄉":{"n":2,"rev":69200,"county":"宜蘭縣","district":"三星鄉"},"新北市|蘆洲區":{"n":1,"rev":30000,"county":"新北市","district":"蘆洲區"},"宜蘭縣|五結鄉":{"n":1,"rev":13333,"county":"宜蘭縣","district":"五結鄉"},"宜蘭縣|羅東鎮":{"n":1,"rev":137131,"county":"宜蘭縣","district":"羅東鎮"},"宜蘭縣|冬山鄉":{"n":5,"rev":70443,"county":"宜蘭縣","district":"冬山鄉"},"宜蘭縣|壯圍鄉":{"n":1,"rev":6857,"county":"宜蘭縣","district":"壯圍鄉"}}},"郭宴菱":{"team":"業務四組","n":11,"rev":330404,"districts":{"高雄市|大社區":{"n":3,"rev":244257,"county":"高雄市","district":"大社區"},"高雄市|路竹區":{"n":2,"rev":47143,"county":"高雄市","district":"路竹區"},"屏東縣|麟洛鄉":{"n":1,"rev":13107,"county":"屏東縣","district":"麟洛鄉"},"屏東縣|潮州鎮":{"n":3,"rev":13113,"county":"屏東縣","district":"潮州鎮"},"屏東縣|內埔鄉":{"n":2,"rev":12784,"county":"屏東縣","district":"內埔鄉"}}},"趙斯蓓":{"team":"業務五組","n":20,"rev":678305,"districts":{"宜蘭縣|五結鄉":{"n":6,"rev":121728,"county":"宜蘭縣","district":"五結鄉"},"宜蘭縣|蘇澳鎮":{"n":2,"rev":194914,"county":"宜蘭縣","district":"蘇澳鎮"},"宜蘭縣|頭城鎮":{"n":3,"rev":111714,"county":"宜蘭縣","district":"頭城鎮"},"新竹縣|關西鎮":{"n":1,"rev":47619,"county":"新竹縣","district":"關西鎮"},"新竹縣|芎林鄉":{"n":1,"rev":75000,"county":"新竹縣","district":"芎林鄉"},"宜蘭縣|壯圍鄉":{"n":4,"rev":49472,"county":"宜蘭縣","district":"壯圍鄉"},"宜蘭縣|冬山鄉":{"n":3,"rev":77858,"county":"宜蘭縣","district":"冬山鄉"}}},"張瑋秦":{"team":"業務五組","n":8,"rev":198403,"districts":{"花蓮縣|吉安鄉":{"n":3,"rev":11392,"county":"花蓮縣","district":"吉安鄉"},"花蓮縣|花蓮市":{"n":5,"rev":187011,"county":"花蓮縣","district":"花蓮市"}}},"程鈺雯":{"team":"行政組","n":2,"rev":0,"districts":{"台中市|北屯區":{"n":1,"rev":0,"county":"台中市","district":"北屯區"},"新北市|三重區":{"n":1,"rev":0,"county":"新北市","district":"三重區"}}},"陳怡雯":{"team":"業務二組","n":12,"rev":746766,"districts":{"新北市|土城區":{"n":4,"rev":118409,"county":"新北市","district":"土城區"},"新北市|蘆洲區":{"n":3,"rev":237582,"county":"新北市","district":"蘆洲區"},"新北市|樹林區":{"n":3,"rev":223132,"county":"新北市","district":"樹林區"},"新北市|鶯歌區":{"n":2,"rev":167643,"county":"新北市","district":"鶯歌區"}}},"楊君柔":{"team":"業務五組","n":1,"rev":44275,"districts":{"桃園市|桃園區":{"n":1,"rev":44275,"county":"桃園市","district":"桃園區"}}}},"counties":{"台中市":{"n":272,"rev":76063574,"districts":{"":{"n":3,"rev":444961},"沙鹿區":{"n":31,"rev":8641654},"北屯區":{"n":59,"rev":15384291},"大甲區":{"n":3,"rev":692731},"西屯區":{"n":23,"rev":11107250},"太平區":{"n":11,"rev":3893610},"南區":{"n":15,"rev":5839952},"梧棲區":{"n":20,"rev":4474286},"南屯區":{"n":30,"rev":9579812},"西區":{"n":4,"rev":479323},"豐原區":{"n":4,"rev":1010878},"清水區":{"n":11,"rev":2913028},"中區":{"n":3,"rev":296247},"龍井區":{"n":10,"rev":2041558},"神岡區":{"n":2,"rev":310574},"烏日區":{"n":5,"rev":1762765},"東區":{"n":7,"rev":1598693},"潭子區":{"n":3,"rev":1321753},"大肚區":{"n":5,"rev":923362},"大里區":{"n":10,"rev":1863471},"大雅區":{"n":3,"rev":441972},"后里區":{"n":7,"rev":789063},"北區":{"n":2,"rev":102102},"東勢區":{"n":1,"rev":95238},"霧峰區":{"n":1,"rev":55000}}},"新北市":{"n":177,"rev":90500714,"districts":{"林口區":{"n":26,"rev":15723932},"泰山區":{"n":5,"rev":2272231},"新莊區":{"n":20,"rev":12236636},"永和區":{"n":6,"rev":1403637},"三重區":{"n":23,"rev":17390985},"淡水區":{"n":16,"rev":11422344},"八里區":{"n":4,"rev":849268},"五股區":{"n":10,"rev":6217588},"蘆洲區":{"n":4,"rev":699017},"中和區":{"n":10,"rev":3046358},"樹林區":{"n":4,"rev":964000},"板橋區":{"n":19,"rev":8720286},"土城區":{"n":13,"rev":3216299},"汐止區":{"n":3,"rev":1314285},"新店區":{"n":9,"rev":3862872},"鶯歌區":{"n":4,"rev":860976},"三峽區":{"n":1,"rev":300000}}},"桃園市":{"n":265,"rev":56984364,"districts":{"中壢區":{"n":37,"rev":9023941},"桃園區":{"n":42,"rev":15355727},"龜山區":{"n":13,"rev":4027279},"新屋區":{"n":26,"rev":2749374},"觀音區":{"n":39,"rev":6144261},"楊梅區":{"n":37,"rev":5518870},"八德區":{"n":14,"rev":4042502},"大園區":{"n":24,"rev":5343667},"平鎮區":{"n":12,"rev":2240938},"龍潭區":{"n":14,"rev":1156497},"大溪區":{"n":3,"rev":208572},"蘆竹區":{"n":9,"rev":1172736}}},"高雄市":{"n":223,"rev":47774367,"districts":{"左營區":{"n":18,"rev":6818008},"鳳山區":{"n":20,"rev":4286421},"三民區":{"n":32,"rev":7622338},"鼓山區":{"n":6,"rev":3108424},"仁武區":{"n":23,"rev":4283150},"小港區":{"n":17,"rev":1678617},"楠梓區":{"n":25,"rev":6250306},"前鎮區":{"n":14,"rev":4236289},"燕巢區":{"n":4,"rev":89006},"大樹區":{"n":6,"rev":664982},"前金區":{"n":5,"rev":1359856},"鳥松區":{"n":5,"rev":415925},"大寮區":{"n":11,"rev":1387667},"大社區":{"n":5,"rev":536342},"林園區":{"n":6,"rev":671741},"新興區":{"n":3,"rev":337691},"湖內區":{"n":2,"rev":289407},"苓雅區":{"n":5,"rev":1581457},"橋頭區":{"n":8,"rev":809195},"彌陀區":{"n":1,"rev":70751},"梓官區":{"n":2,"rev":354057},"路竹區":{"n":3,"rev":237619},"":{"n":1,"rev":552533},"岡山區":{"n":2,"rev":47143},"旗山區":{"n":1,"rev":55442},"茄萣區":{"n":1,"rev":30000}}},"台北市":{"n":133,"rev":50281764,"districts":{"文山區":{"n":9,"rev":6086145},"北投區":{"n":21,"rev":8492222},"中山區":{"n":19,"rev":4410662},"信義區":{"n":7,"rev":3079586},"松山區":{"n":8,"rev":3210166},"內湖區":{"n":7,"rev":3358825},"大安區":{"n":16,"rev":6264135},"大同區":{"n":11,"rev":4333442},"萬華區":{"n":10,"rev":2227451},"南港區":{"n":6,"rev":4619879},"中正區":{"n":10,"rev":1930758},"士林區":{"n":9,"rev":2268493}}},"台南市":{"n":168,"rev":26443838,"districts":{"善化區":{"n":14,"rev":2767383},"關廟區":{"n":5,"rev":321255},"安南區":{"n":21,"rev":2250739},"永康區":{"n":27,"rev":5273185},"北區":{"n":8,"rev":2259658},"麻豆區":{"n":6,"rev":635133},"後壁區":{"n":2,"rev":167560},"中西區":{"n":2,"rev":387795},"安定區":{"n":10,"rev":1678291},"官田區":{"n":3,"rev":781146},"六甲區":{"n":2,"rev":444972},"佳里區":{"n":5,"rev":537542},"新化區":{"n":8,"rev":715683},"新營區":{"n":6,"rev":1637928},"新市區":{"n":5,"rev":489243},"安平區":{"n":3,"rev":333843},"下營區":{"n":1,"rev":33000},"歸仁區":{"n":8,"rev":1118275},"南區":{"n":8,"rev":702408},"山上區":{"n":1,"rev":341290},"西港區":{"n":5,"rev":375180},"學甲區":{"n":1,"rev":24000},"東區":{"n":8,"rev":1623058},"鹽水區":{"n":2,"rev":112476},"仁德區":{"n":5,"rev":1239843},"七股區":{"n":1,"rev":12000},"將軍區":{"n":1,"rev":180952}}},"彰化縣":{"n":107,"rev":8546682,"districts":{"花壇鄉":{"n":7,"rev":524550},"員林市":{"n":14,"rev":1906710},"二林鎮":{"n":2,"rev":112145},"伸港鄉":{"n":6,"rev":406537},"和美鎮":{"n":8,"rev":802513},"北斗鎮":{"n":5,"rev":104629},"田中鎮":{"n":4,"rev":311591},"埔心鄉":{"n":6,"rev":493441},"芳苑鄉":{"n":1,"rev":93531},"永靖鄉":{"n":4,"rev":149761},"社頭鄉":{"n":8,"rev":515260},"彰化市":{"n":14,"rev":1717364},"大村鄉":{"n":2,"rev":141735},"埔鹽鄉":{"n":2,"rev":70790},"溪湖鎮":{"n":12,"rev":203832},"芬園鄉":{"n":1,"rev":47619},"秀水鄉":{"n":2,"rev":96818},"溪州鄉":{"n":4,"rev":198537},"鹿港鎮":{"n":4,"rev":620748},"福興鄉":{"n":1,"rev":28571}}},"雲林縣":{"n":46,"rev":2367318,"districts":{"斗六市":{"n":12,"rev":849006},"二崙鄉":{"n":2,"rev":89960},"土庫鎮":{"n":5,"rev":156355},"西螺鎮":{"n":4,"rev":100506},"斗南鎮":{"n":10,"rev":581655},"古坑鄉":{"n":1,"rev":38256},"虎尾鎮":{"n":9,"rev":411801},"北港鎮":{"n":2,"rev":71060},"莿桐鄉":{"n":1,"rev":68719}}},"嘉義市":{"n":14,"rev":1250806,"districts":{"西區":{"n":10,"rev":1031244},"東區":{"n":4,"rev":219562}}},"宜蘭縣":{"n":54,"rev":2860288,"districts":{"五結鄉":{"n":9,"rev":370600},"礁溪鄉":{"n":8,"rev":617240},"宜蘭市":{"n":7,"rev":504651},"冬山鄉":{"n":8,"rev":174559},"蘇澳鎮":{"n":4,"rev":499580},"員山鄉":{"n":6,"rev":250865},"頭城鎮":{"n":5,"rev":180133},"三星鄉":{"n":2,"rev":69200},"羅東鎮":{"n":1,"rev":137131},"壯圍鄉":{"n":5,"rev":56329}}},"屏東縣":{"n":87,"rev":4822254,"districts":{"九如鄉":{"n":2,"rev":21276},"萬丹鄉":{"n":12,"rev":860553},"內埔鄉":{"n":16,"rev":917074},"屏東市":{"n":14,"rev":641328},"麟洛鄉":{"n":2,"rev":104125},"潮州鎮":{"n":11,"rev":559750},"崁頂鄉":{"n":1,"rev":54718},"長治鄉":{"n":7,"rev":388453},"東港鎮":{"n":8,"rev":429621},"新園鄉":{"n":6,"rev":482761},"南州鄉":{"n":1,"rev":12900},"新埤鄉":{"n":2,"rev":128660},"竹田鄉":{"n":2,"rev":115959},"佳冬鄉":{"n":2,"rev":47933},"萬巒鄉":{"n":1,"rev":57143}}},"苗栗縣":{"n":81,"rev":7298305,"districts":{"竹南鎮":{"n":27,"rev":3609376},"苗栗市":{"n":10,"rev":307211},"公館鄉":{"n":2,"rev":116008},"苑裡鎮":{"n":9,"rev":729186},"造橋鄉":{"n":1,"rev":26860},"頭份市":{"n":23,"rev":1963380},"後龍鎮":{"n":7,"rev":370093},"銅鑼鄉":{"n":2,"rev":176191}}},"嘉義縣":{"n":29,"rev":1008736,"districts":{"六腳鄉":{"n":2,"rev":16513},"大林鎮":{"n":3,"rev":22006},"太保市":{"n":4,"rev":168476},"新港鄉":{"n":6,"rev":153220},"溪口鄉":{"n":1,"rev":49538},"民雄鄉":{"n":8,"rev":346004},"中埔鄉":{"n":2,"rev":69206},"梅山鄉":{"n":2,"rev":93569},"水上鄉":{"n":1,"rev":90204}}},"南投縣":{"n":44,"rev":3741979,"districts":{"草屯鎮":{"n":15,"rev":2128391},"埔里鎮":{"n":8,"rev":523393},"集集鎮":{"n":2,"rev":84568},"南投市":{"n":16,"rev":947858},"竹山鎮":{"n":3,"rev":57769}}},"新竹縣":{"n":67,"rev":7169614,"districts":{"竹北市":{"n":14,"rev":1711518},"關西鎮":{"n":3,"rev":146627},"湖口鄉":{"n":28,"rev":2793109},"寶山鄉":{"n":3,"rev":393967},"新豐鄉":{"n":10,"rev":942518},"橫山鄉":{"n":1,"rev":102000},"竹東鎮":{"n":2,"rev":444164},"新埔鎮":{"n":3,"rev":357854},"芎林鄉":{"n":3,"rev":277857}}},"新竹市":{"n":41,"rev":4650757,"districts":{"北區":{"n":21,"rev":2347397},"東區":{"n":14,"rev":1678944},"香山區":{"n":7,"rev":624416}}},"基隆市":{"n":9,"rev":1652855,"districts":{"中正區":{"n":3,"rev":635284},"中山區":{"n":2,"rev":536309},"暖暖區":{"n":1,"rev":239311},"信義區":{"n":1,"rev":12224},"安樂區":{"n":1,"rev":188290},"仁愛區":{"n":1,"rev":41437}}},"花蓮縣":{"n":10,"rev":326793,"districts":{"花蓮市":{"n":7,"rev":315401},"吉安鄉":{"n":3,"rev":11392}}}}};
+const DATA_2025_PROJ={"呂佩宜":{"台中市|":{"勁鋒貿易":22247},"台中市|沙鹿區":{"茂洋天玥META":107433,"禮御":46686,"勝興興站":732067,"佳瓚鹿瓚":713905,"泉美御明秀":280838,"登峰寶城":72198,"勝美.向上":299143,"住寅純萃":595188,"住寅大晶囍":96541,"大樁十六韻Ⅱ":381713,"富宇時代花園":83767,"森邸":190476,"富宇中山匯":209524,"保辰一森恬":142857,"富宇光嶼":186667,"德光星綻":169285,"麗景風和":85000,"勝麗交響曲":886025,"坤悅沐光邸":637532,"安城築美":138095,"坤悅映光田":322159,"富旺心海綻":121905,"富宇漾":121905,"佳瓚大讚":250793,"佳格美墅":80952,"華偉知見":20823,"德光興境":144322,"日沐亦景":21000,"中科与森":110000},"彰化縣|花壇鄉":{"亞哥之緒":155318},"雲林縣|斗六市":{"勝麗MVP":66318,"築澤臻美":192788,"璞樸莊園PathHouse":93357,"寓見愛2":18571,"緻匯":100000,"連連發好韻":65707,"湛然禾懋花園":95238,"拓樸正心":23809,"翡翠森林":22677,"鄉林．雲峰":104762,"拓樸南京":40400,"東德一品苑":25379},"雲林縣|二崙鄉":{"晴森院":81579,"桃花源系列五「二崙桃花源」":8381},"彰化縣|二林鎮":{"吉利馥築":8791},"台中市|梧棲區":{"聯悦馨":8070,"聯虹鉑玥":124482,"勝興豐境":369871,"仁里晴美":83451,"ONE PLUS 昇祐智慧商辦大樓":142857,"萬事如邑":85714,"佳鋐首耀":440745,"藍圖UNI":114286,"富宇富嶼":140952,"禾立興梧同墅":47619,"好宅緻美":142857,"勝興豐川":744153,"荷園二十一期":140952,"益翔有藝仕":484038,"遠雄幸福成":257143,"昌祐U City":487239,"御墅青安":141000,"協勝港心":339205,"中央園邸":65366,"遠雄星呈":114286},"台中市|南屯區":{"碧根印白":376923,"坤悅君睿":456699,"陸禾誠寓所":297143,"豐邑匯禮":283447,"國泰森林薈":320853,"聚富粼粼":650829,"睦唐與樹":938939,"勝美琚":327404,"豐邑G TOWER":381778,"齊又新執善":76190,"琢力自然":83810,"國泰蒔萃":142857,"鉅森匯":123810,"睦昇韶光漫":468714,"石云尹之居":190662,"勝旺悅":164457},"雲林縣|土庫鎮":{"馬光綻3期":69727,"欣承花妍":20952,"凱迪土庫荷雅NO1":22667,"馬光綻1期":33238,"弘鋆-竹寮":9771},"雲林縣|西螺鎮":{"高峰滙":32912,"台富光復":31404,"寶雲天藍":18095,"和田池光馥境":18095},"彰化縣|北斗鎮":{"鉅麒芯釀":39198,"築森十二賦":30080,"龍勝傳家一期(公寓)":8857,"龍勝傳家一期(透天)":10190},"彰化縣|永靖鄉":{"慧來詠富":24332,"標緻豐禾二期":45190,"安家3":11429},"雲林縣|斗南鎮":{"微風City2":18377,"富旺悅榕花園":103604,"台和他里霧":19048,"一暘斗南文心":76190,"墅合院5(華廈)":107845,"墅合院5(透天)":84640,"興世代二期":66667,"MY微風-華廈":28571,"潤薪大城2":76074,"斗南春不老":639},"彰化縣|社頭鄉":{"喬茂泰安":74959,"首華富城":102000,"逸境":95238,"高鐵水悦":20190,"舊社人文二期":29714,"高鐵升之泰二期":171428,"明華.高鐵驛站":14857,"展源新天地(公寓)":6874},"彰化縣|彰化市":{"中山之櫻":575050,"鉅陞三福宅邸":257143,"遠雄幸福成":190476,"坤育師大苑":60472},"雲林縣|古坑鄉":{"雲龍太棧5期":38256},"台中市|西屯區":{"遠雄琉蘊":476190,"遠雄綠美":538096,"親家雲硯":56190},"台中市|清水區":{"遠雄星呈":990476,"中山大道":463558,"富宇大琚":186667,"富宇蒔光":185715},"彰化縣|溪湖鎮":{"佑彰湖星":22450,"溪湖堡量豐華":14286,"格誠誠星":47619,"怡宏珍藏3":11429,"九維建築ONE時代":13714,"鉅富天下":11429,"日初觀山":47400,"睿元悅上景I":9614,"得意居三期":8568,"悅清居Ⅱ":9184,"祥揚首綻":6123,"溪湖-福大唯美":2016},"台中市|烏日區":{"總太V1":450041,"櫻花大綻":958359,"巨陽森昇活":129448,"和峻捷市邦":114917,"穩喬東園墅":110000},"雲林縣|虎尾鎮":{"川匯靜崗6":29047,"麗璽晶硯-麗蒔":209522,"人文君聚":18667,"禾楓君悅 - 高鐵綻8期(大樓)":39905,"東方郡美":28571,"御圓":29524,"宇荃·上景":29524,"匯如意":4898,"弘鋆-龍安":22143},"台中市|北屯區":{"高綺幸匯":76190,"昌祐又一景":50400,"遠雄樂元":123810},"彰化縣|溪州鄉":{"日日市城(透天)":20500,"日日市城(公寓)":22357,"寓墅臨風(公寓)":95238,"興富川":60442},"台中市|潭子區":{"昌祐捷作":201600},"雲林縣|北港鎮":{"華緯大悅":34386,"桂芳圓2":36674},"南投縣|草屯鎮":{"寬心豐匯":211788},"台中市|南區":{"富宇玥和":314465},"台中市|東區":{"泓瑞拉拉漾":100800},"彰化縣|田中鎮":{"阜岡初之境":114286,"田中匯":83810,"斗中大苑":14286},"台中市|大里區":{"知趣泊安":47619,"大漁樂芙":364852,"睦唐大隱德芳":583139,"曼哈頓(透天)":217495,"立彩FANCY":50400,"大隱之美NO3.品日子":66415,"滙文心":1089,"理澄峰境":55000,"昌祐 幸福大里":446190,"新葉莊":31272},"雲林縣|莿桐鄉":{"璞樸禾禾":68719},"台中市|后里區":{"光耀后科-后科1時代6期":95238,"誠居后花園":142857,"富旺敦厚":175251,"青禾":83810,"科鉑悅":96907,"曉富婆":60000,"坤悅禮御":135000},"台中市|北區":{"興富安嘉":47102,"雲極曙光":55000},"台中市|霧峰區":{"滙中正":55000}},"曾方音":{"新北市|林口區":{"築禾琢玥":200000,"竹城・日和":195469,"原森TWIN TOWERS":462183,"樂元素_樂原墅":0,"森鉅M-逸境":376837,"聯虹珺玥":754080,"聿見美璟":961974,"知築蒔岳":265000,"宏樸 曉霧":300000,"新潤世界都心":4713430,"群和 FUTURE LINK":899999,"立軒天蒔":703494,"森鉅M-林境":1015000,"仁愛金鑽":714285,"立軒建設力行段案":49108,"亞昕．寓邸":680952,"長虹天聚":824875,"璽來登帝璽":744048,"盛德誠":246800,"九揚華樂":600000,"富浤一響":300000,"帝一院":396927,"家悦美":88571,"易捷聿白":72000,"頤昌松玥":100000,"富堡晶鑄":58900},"宜蘭縣|五結鄉":{"大吉築青":17187},"桃園市|觀音區":{"凱田藝境":85688,"悅世界2":0,"雄讚家NO.5":53571,"大清仁愛錄":320571,"聯雄新視界":57143,"立冠敦皇10(透天區)":25000,"寓見朗朗":57143,"合展大觀富琚":285714,"益翔新天地":152381,"大觀梧双":176190,"悦佳文萃":390000,"和發首映":57143,"誠佳立葉":76190,"嘉禮青裕":95238,"馥二代":24000},"新竹縣|關西鎮":{"幸福家家":26048},"新北市|三重區":{"峰景敦仁":415429,"公園yoyo":2571489,"潤泰CITY PARK":1070860,"晴空大地":2315319,"捷洋蔚來":1120685,"都廳大院2":1745956,"新濠漾III-巴黎公園":180312,"宏道巴黎花都":1796698,"新富雙宇":154000,"新濠漾4-英倫公園":1175731,"集緻美":95238,"鼎藏豐碩":974267,"聚泰綻":157700,"甲山林市政帝寶":1600291,"香朵":345000,"漢皇一寓":171429,"立信藏玉":300000,"統元極美":150000,"自由綠洲":250476,"都廳大院":308860,"成功集美":174905,"印象左岸":65941,"甲山林市政帝景":250399},"台北市|松山區":{"鳴森大苑-鳴森苑":1450864,"幸薈":236642,"碩樺謙禾":20000,"文華粹":95238,"利晉·崧喆":380952,"睿泰曜":645806,"沐青":160614,"華造 南京鉑蘊":220050},"宜蘭縣|宜蘭市":{"尚品院":310266},"桃園市|大園區":{"合登領航城":270988,"城鄉文學苑":128571,"臥墨池":1170995,"御禾院":125030,"康豐大道":8571,"佳瑞知森":127605,"航綻甜心":193333,"元基至善1":25000,"鈞貴極馥":190476,"川洋青勻":50000,"協勝雙子城II":135000,"高誠君品":100000,"逸偉A+":626000,"璟都航空城":300000,"宗佳領御":200000,"格林小鎮":297000,"合展悦恬":383600,"上順麗":266000,"臻璞":210000,"日青悠":193747,"松合苑5":149143,"傳佳樂":42858,"大耀首賦":49750,"京懋敦和":100000},"新北市|五股區":{"芳洲PARK":733181,"日進學A區":1241074,"幸福享享":572343,"九揚雙子星":1437905,"星波畔":603464,"成泰美":220000,"祥德莊園":1023907,"快樂王國-夢享城":190476,"璨美家":95238,"微美之星":100000},"新竹縣|竹北市":{"今天之外":20115},"新北市|蘆洲區":{"當代集賢-琢謙":431435},"台北市|大同區":{"城心曜曜":666050,"宏道一品":541311,"大同新豐采":726919,"毅聯WIN":802175,"三磐橋峯":276190,"世座友樂町":476476,"圓山耑宇":100000,"毅聯首馥":519631,"SOHO筑富":69434,"光合織森":150000,"毅聯win":5256},"新北市|樹林區":{"將捷朗學":583168,"欣懋川玥":157700},"新竹縣|橫山鄉":{"墅沛NO.11":17000},"新北市|鶯歌區":{"渼麗綻":452857,"上林旭":50000,"國華綻":190476},"桃園市|龍潭區":{"悦恬":48209}},"簡順隆":{"桃園市|中壢區":{"大華漾":40203,"潤青":1448848,"滙盈又一村":120000,"樺龍淳藝":24958,"大清璞樂":130000,"大清城双":297714,"樸翔初耘":552333,"漢曜旭":104571,"大清清井澤":354286,"富御莊園":47143,"誠鑫19":268571,"璞園畾畾青":120000,"宜誠泱":333333,"益展有福":292857,"勤樸大道":493687,"柏宣天擎":276191,"櫻花響":76190,"寶台天馳":190476,"大江雲鼎":380000,"HLA‧悦":742857,"明日香":23810,"廣川市2":238095,"樂MORE":25000,"墅語苑3":57000,"大清上景":552721,"澍之丘":237850,"宜誠丽左岸":161904,"廣川市":290566,"保利首綻":91429,"宜雄絢耀":200588,"和發采采":173811,"璟城A22":114286,"深耕17":174429,"鑫利川-三城":159441,"聯懋杉苑":161650,"鴻踞樸藝":42143,"馥御":25000},"台北市|文山區":{"元利四季莊園":3197585,"漢皇蒔序":141189,"信義富境":1317188,"敘文山":30671,"丰景":321600,"文山學":309538,"遠雄晴川":380952,"國泰悠然":180952,"碩樺拾景":206470},"桃園市|新屋區":{"寶鈦墅學家":0,"清華隆陞":66332,"大清夢想家–透天區":168429,"大清夢想家–華廈區":168429,"雄讚家":3571,"勤本詠恆":60285,"信義1號苑":64000,"康捷雲禮城":104571,"九豐花園":116571,"幸福WAY":285714,"冠昱金寳III":30000,"盛竑時代":476191,"勤本映月":42000,"勤本青町":90714,"印象∙好好":25000,"成裕ONE":95238,"中潤晴朗":94500,"寶鈦美-2":56658,"鉅慶歐采":90000,"樂讀家":25000,"墅耕":50000,"僑昇大院":23000},"宜蘭縣|礁溪鄉":{"歡喜家園no.25":7256,"富登新20":9000,"水野路路(華廈區)":128571,"桂冠-礁溪帝堡":22000,"仁愛映巷":59810},"台北市|中山區":{"松江．桓榀":364323,"佳元當代美術館":190476,"長虹.聖得福TOP31":1301027,"松江‧阡語":7429,"松江WOW":46497,"紳藏":129119,"潮中山":99963,"沅陞青芷":98333,"后麗昕":285714,"吉美富徠 馥樂":142857,"淞暘潮":266667,"靚安":56500,"中山之心":117843,"睿泰絵。":40000,"大直恆琚":122224,"春風大院":300561,"中租名笙":243470,"達欣文和苑":550040,"明明":47619},"新竹縣|竹北市":{"青溪賦":15016,"美邑初蘊":131973,"名發 天琚":58773},"宜蘭縣|宜蘭市":{"紘大旺築":0,"桂冠公園1號院":22000},"宜蘭縣|冬山鄉":{"旭川2":26258},"新竹縣|新豐鄉":{"心豐花園":6071},"宜蘭縣|蘇澳鎮":{"好室多":185209},"新北市|板橋區":{"禮御":903720,"京東賞":600000,"三輝白昀":415118,"芯哲園":104082,"甲山林濱河帝景":1672512,"大業":380952,"THE VIEW":94679,"耑芃":238095,"日安PARK":1135647,"森之道":583164,"永康真":190476,"協和新中興":461064,"立信雙星":204000,"立信首馥":219048,"新板東京":447619,"遠揚之森A⁺":431035,"新潤世界城":284286,"儷堤珍寶":27970,"立信晴朗":279200},"台北市|萬華區":{"南海御景":267306,"長虹MVP":414197,"ASTER ONE":242476,"禾田田":76191,"龍邦豐馥":95238,"橡樹貴麗":190476,"岳泰豐鼎":83943,"寶舖全健築點悅":412381,"昇陽承光":243842,"東騰元町":201401},"宜蘭縣|員山鄉":{"紘大旺築":27000,"香榭麗舍9":9000},"台北市|中正區":{"漢皇城双":253952,"向陽上冠":149221,"仁愛尊邸":45000,"熙鼎九簷":152381,"皇翔柏悅":351574,"豐基皇居":435048,"柏金":150606,"新光人壽總統傑仕堡":73600,"南風裡":63000,"南海敘":138700},"新北市|土城區":{"朗沐L'AMOUR":1142856,"紅布朗花園":190476,"皇翔MRT":423150,"寶佳淳青":190476,"瑞堯禾芯":40000,"和耀美家":434286,"世界花園":72000,"松陽馥麗":378814,"台信琢岳":832,"新濠岳":160000,"台北首席":65000},"宜蘭縣|五結鄉":{"沐の四季(沐四季)-電梯公寓區":95238},"宜蘭縣|頭城鎮":{"晏京山海序":47619},"桃園市|楊梅區":{"勤樸大道":49028},"桃園市|桃園區":{"THE VIEW":48178},"桃園市|八德區":{"向陽上冠":153160,"寶鈦美-2":48104},"桃園市|平鎮區":{"光禾翡麗-璽玥":40000}},"簡艷華":{"高雄市|左營區":{"寶格莉":238095,"自由朗誦":859736,"開遠諾金":165702,"青曦流域":40982,"京城第一樂章 OPUS ONE":1573989,"大道淳":96046,"小森學":363832,"京城天湖":762038,"仁發和":513698,"微笑高鐵":189384,"棋琴26重奏":70000,"實踐金賦":273238,"芳崗高鐵棧":284731,"NeXT21":190476,"光洲耘海":182857,"北城之星":638952,"高鐵SONG":85714,"聯上芯城":171255},"高雄市|鳳山區":{"繪上品":160080,"愛上鈺璽":91587,"水律":499058,"麗晶森學":623347,"繪上城":184674,"保泰一品":253757,"頂記 逸丰景":357143,"紅頂":171428,"南統微笑城堡":38096,"莊子No.3":39600,"悅讀悅禾":840750,"大禾敦品":200000,"幸福居9":40000,"藏美 東京都":95238,"香榭艾儷":114286,"御禧福居":109714,"利融永御":147393,"花町院":142857,"百達耘邸":95238,"聯上ME悅":26404},"屏東縣|九如鄉":{"品宏-悦見NO35":6676},"屏東縣|內埔鄉":{"立有WE":57027,"鄉庭瀧璟":125837,"萬吉蒔遇":107655,"太富吉美":26976,"幸福首筑":17558,"皇家欣天地三期 森鄰-華廈":85713,"美麗光年2":90476,"大悅九期-瑞苑":57771,"良悅一二":95238,"和昌峰采2":118738,"好厝+":38096,"恆聚未來城":28571,"逸靚VILLA":9900,"美和綻":19048,"福樂幸福家":25686},"高雄市|仁武區":{"三發·首席大院":191609,"琢悦2":529468,"澐之森":205634,"光空水":84429,"皇家美墅16期-飛翔家2":114286,"高京大鎮":396270,"遠見蒔美":888381,"華雄天地":476190,"多城市Ⅱ":47619,"厝里森":40000,"光之匯":125714,"凡花":38095,"覞林":155477,"對宴":19048,"澄光":264746,"開遠綠園GreenPark":40000,"高京豐薈":142857,"頂亨名紳":55000,"築上景":95238,"大橘得悅":55000,"健暉ERA":68000,"健暉逸品":68000},"高雄市|楠梓區":{"廣積平安璟苑":23571,"遠見禾悅":180507,"芳崗河左岸":577086,"博市陞":775141,"原旭":94087,"捷•境":447619,"翊城晶綻":55000,"興連城Pro+":93123,"興.楠梓":773238,"四季森":466190,"御都匯":100000,"森之星":132400,"月理河":300049,"成宇-名仕鈺苑":314286,"鹿序":19048,"家家LOVE":20000,"高大之森2高大之上":380952,"蔚藍海19":496191,"吉隆森淼":142857,"蒙瑪特":151190,"遠雄一靚":190476,"敘青田":99130,"以學MDT":35781,"富科大苑":33000},"屏東縣|麟洛鄉":{"富苑":62214},"高雄市|燕巢區":{"橋科華城2":6864,"時尚領秀8":28571},"屏東縣|潮州鎮":{"御潮苑":44549,"五魁新境":103706,"潮未來":47619,"晴美築":58400,"幸福168(透天)":3200,"天景潮院":115438,"幸福168(華廈)":36000,"五福金湛":90154,"怡家園":14400,"品學琚":21600,"佳建築6期":11571},"高雄市|鳥松區":{"圓山富利":29155,"圓山君玥":95238,"圓山匯星":95238,"裎湖御璽":151294,"圓山粼粼":45000},"高雄市|大社區":{"一方撰":177799,"皇家旺博市10期":114286},"屏東縣|屏東市":{"景湛":8449},"高雄市|三民區":{"捷•境":93334,"四季森":10000},"高雄市|橋頭區":{"邑信城邑":60000,"一方讚2":95238,"鋭揚橋科堡":396495,"皇家吉品10期":95238,"築白":20000,"禾馨":95238,"鹽序":24000},"台北市|中正區":{"漢皇城双":51584},"台南市|永康區":{"富利暘-仰承":135476},"高雄市|路竹區":{"科心豐閣":190476},"高雄市|岡山區":{"忠誠峰藏":20000,"皇家晶典25期 -富貴集":27143},"屏東縣|竹田鄉":{"大砌松濤":56779},"高雄市|梓官區":{"小春日和3(華廈)":20000},"台南市|安平區":{"華平深見":85714,"百慶育平居":73000},"台南市|安南區":{"邰欣地堡100期-透天":51075,"佳展安和":285715,"宜室感":91288,"大河佃":86400,"天器12":18200,"時美":20000},"高雄市|茄萣區":{"海灣villa8":30000}},"鄧瑋婷(房)":{"台南市|善化區":{"南科怡華悅":152946,"善化甄品":380596,"拾萃莊園":161191,"安盛首善":213042,"明日新城安":303712,"誠銳幸福配方":30884,"緻未來":35000,"城之芯":266667,"佳鋐科匯":558542,"吾寓NO.3":85714,"謙大華":114285,"和紘善美":258142,"淳真年代6":142857,"德和擇善(德和大邁27)":63805},"台南市|關廟區":{"尚寬大院":5377,"心心相印7":51930,"心心相印8":29313,"幸福之森":202110,"吾居7":32525},"嘉義市|西區":{"享風華":92263,"詠富":104705,"天晴21":47762,"佳展大嘉":57143,"湛然天玉":38096,"隨處樂":57143,"湖美鉅":67419,"湖美喆峰":56858,"勝旺·有嘉":509084,"富藏":771},"台南市|安南區":{"聯太WHITE HAUS":21984,"邰欣地堡100期-透天":42253,"邰欣地堡79期":40381,"美地莊園":15100,"佳佳園5":95238,"信美明日絵":95238,"昕暉詠翠-昕綠洲":22118,"佳展安和":83577,"硯青":1002,"三富樂樂":39435},"台南市|永康區":{"佳晟家和":317750,"皇政首席鍗𨰦":8143,"永安一方No.5":128637,"勝美AI":299980,"遠雄東御苑":58704,"光這裏":121388,"昕暉景寬":369880,"遠雄山禾":628571,"春福詠序":142857,"春福淳青":380952,"春福平蒔":666509,"安新家II":24000,"鄰語堂5":196857,"木津川":190476,"佳晟家安":26667,"翰唐創築":35000,"勝美A Park":278333,"上賦大苑":58200,"邰欣地堡90期":218381,"佳晟家康":190476,"伯捷HOKI":209913,"建築家 INFINITE":190476,"時代至上":142857,"連建安什":56000,"富利暘-仰承":55000,"大桔郡11":110000,"三發橋":31702},"台南市|北區":{"城之樹":316193,"富煜拾美":194913,"日東昇寬邸":70000,"日東昇昕開元":78200,"立人名邸":33600,"成大之森":1418483,"禾沺築光":28000,"欣府城-一品樓":71429},"台南市|麻豆區":{"臺邦諧作悅":410835,"誠銳大謙":26774,"綠品苑2-透天":34286,"金艷富邸-12":12000,"太茂心嚮":95238,"滿築":56000},"台南市|後壁區":{"竹子腳風情3":131741,"樂活居":35819},"嘉義縣|六腳鄉":{"雄立富邑":3675,"富御嘉":12838},"嘉義縣|大林鎮":{"知樂":5182,"中祐雅苑":9000,"知心":7824},"台南市|中西區":{"三發DIAMOND ONE":379395,"天鑽LV":8400},"台南市|安定區":{"南科心集":150787,"希建築12":322555,"陶喜LiHo5":479366,"高第禾禾2":80000,"管弦苑(德和大邁26)":123087,"明日計畫":150067,"安藝墅":12000,"邰欣地堡91期":226479,"南科綻":113550,"大京藏6":20400},"台南市|官田區":{"青日朗朗":348709,"多采3":260973,"小春日和":171464},"台南市|六甲區":{"双囍":340210,"好事HOUSE6":104762},"台南市|佳里區":{"快捷市":20744,"宇森樓厝2":212036,"佳佳園2":66667,"千堂·初":57143,"臺邦富裔":180952},"台南市|新化區":{"蒔暙":345762,"長築白樓1":114642,"居易白":36710,"順利騰峰":57143,"富凰大賦(大樓區)":66667,"天闊":70000,"白樓2璞域":23724,"永鄰6":1035},"嘉義縣|太保市":{"銀座二番":75867,"和心3":25467,"天悅 天闊系列.2":23333,"宏騏大悅":43809},"嘉義縣|新港鄉":{"蒔光":34077,"新陶城":33143,"大璽NO.3":22590,"e奈米.悅綠墅":22667,"采瑞馥寓":23219,"久督悠品NO.6":17524},"台南市|新營區":{"春虹.峇里":263073,"佳展大新":339251,"佳順大悅":853937,"國圖好境":66667,"松濤舘8":55000,"理想新東":60000},"台南市|新市區":{"高第璞璞+":97952,"邰欣地堡96期":207053,"常辰和邑":118143,"南科富境":28000,"囍事連連18":38095},"嘉義縣|溪口鄉":{"悠然居":49538},"台南市|安平區":{"華平深見":63129,"光洲湖美":112000},"嘉義縣|民雄鄉":{"東榮院":24741,"寶格双星":110542,"三貴星空樹":61101,"民雄帝標":34286,"福德人家7":44144,"福德人家6":38248,"愛麗一期":28571,"星視界3":4371},"台南市|下營區":{"怡華好美":33000},"台南市|歸仁區":{"晶悅合一":335542,"里仁":95238,"安庭灣":136000,"和紘大景閲":90000,"春宜5":38095,"歸仁之星":275781,"初居3":52381,"佳順大富":95238},"嘉義縣|中埔鄉":{"東唐境":43644,"薪天畝2期":25562},"嘉義縣|梅山鄉":{"美山町Ⅱ":72331,"佑任建設 NO.10":21238},"嘉義縣|水上鄉":{"久督悠品5":90204},"台南市|南區":{"華友聯ONE LIVE":390338,"福灣寬庭13":57143,"森安邦":57143,"織筑藏樂6":57143,"欣雄建設-敦品III":53698,"吾居6":31759,"馨喜悅2":22140,"是建築":33044},"台南市|山上區":{"淳真年代7":341290},"台南市|西港區":{"双贏":142857,"大麗心恬":57143,"富裕人生19":95238,"築夢家園12":24942,"為有巢-安吉閣樓":55000},"台北市|中正區":{"漢皇城双":66092},"台南市|學甲區":{"閎景大院":24000},"台南市|東區":{"舜之璽":95238,"郡騰慕光":85714,"邰欣地堡70":342858,"日東昇大於":35000,"松丹達麗":621914,"國城寳實":290476,"醇白":52381,"研森":99477},"台南市|鹽水區":{"月津帝居":100000,"合申白京":12476},"台南市|仁德區":{"東都綠學":680681,"吾寓NO.2":85714,"植上東門":171429,"昕悦東城":287075,"昕悅東城":14944},"嘉義市|東區":{"言智立學":95238,"天選":33333,"九泰謙玥":47619,"湖美大院":43372},"台南市|七股區":{"金艷富邸-10":12000},"台南市|將軍區":{"臺邦秘境":180952},"高雄市|左營區":{"仁發和":30366,"NeXT21":57000}},"曾家羚":{"台中市|北屯區":{"鉅虹R&G":519930,"之序":175286,"惠田樹語靚":0,"櫻花柳川之櫻":754650,"寬展緣森":75783,"雋業V雋":265936,"駿寳VILLA":178700,"大漁仰昀":88882,"浩瀚景立方-菁英區":715115,"睿馥君和":294404,"知哲永樂":176375,"富宇原上琚":244981,"德鑫一璟":348745,"仁山沐華":628571,"坤聯發建設崇德路案":89524,"大山謙里":80000,"大城二月埕":196257,"大城吾界":122400,"浩瀚創立方4x4":523811,"金林梧境":430333,"豐謙HOME+":100000,"泓瑞洲際之森":513868,"盛築玥":226667,"坤悅‧泊岳":944213,"富宇藏富":142857,"遠雄敦富":380690,"樂宇禮寓":95238,"舜元悟野":430852,"德鑫森PARK":342857,"元城上階綠":142857,"國敬典藏":152308,"富比世2":74286,"文心O’LIVE":83810,"京日晶日":69970,"松竹敦富":167241,"豐邑 豐穗":142857,"嶼宮源":101750,"富華澐光":57048,"冠德崇德綻":21353,"遠雄丰尚":95311,"國聚之瑑":464614,"雅敦崇德序3":33528,"鴻邑松崨境":566443,"鴻承壹流":22836,"八展洲際首富":120000},"台中市|大甲區":{"櫻花大甲之櫻":619131},"台中市|沙鹿區":{"國雄北歐莊園-森林區":302904},"台中市|南區":{"U HOUSE":0,"和瑞文心樂章":1489616,"坤悅語文心":1285891,"元境大喜":400400,"泓瑞恆昕":190476,"森宇樂慕":344761,"鑫鈺知境":316663,"浩瀚光与玥":212532,"鼎義國圖館":9152,"國聚之尚":464500,"國聚之邑":124372,"X CITY昌祐雲之境":292057,"高工湛":341667,"隱大藴":53400},"台中市|南屯區":{"豐謙植得":111326,"富宇市政大道":238095,"鉅虹蒔美":142857,"國聚之見":512986,"國聚之穎":397499,"國聚之築":192124,"惠宇THE ALPHA":151800},"彰化縣|伸港鄉":{"格睿森玥":33099,"伸東雅苑":115465,"世霖官邸Ⅱ":96857,"世紀歐洲2":47619,"格睿全園":90640,"世霖官邸":22857},"台中市|豐原區":{"東方大苑":261045,"坤聯富豐原匯":198766,"晴山白里":327258},"台中市|西屯區":{"浩瀚豐森態":150108,"達麗拾穗":1264409,"和瑞文華樂章":598410,"親家雲硯":122856,"囍御水湳":15765},"彰化縣|和美鎮":{"格誠竹晨":59024,"山水晴光":61581,"格誠竹暘":95238,"房角石悦":185429,"山水謙閤":85714,"富旺W行館":220289,"格誠竹美(透天)":47619,"銓邑‧境好":47619},"台中市|清水區":{"佺築鰲峰MOMA":295080,"明日享享":190476,"寶贊開發市鎮北段案":143809,"兆國琢藝":142857,"聯悦馥":108819,"嘉麗WINNER":152238,"良鉅柒尚":53333},"彰化縣|北斗鎮":{"賦逸居":16304},"彰化縣|田中鎮":{"田中 薇閣臻寶":99209},"南投縣|集集鎮":{"日月雲龍九":46472,"雲龍太棧7":38096},"彰化縣|芳苑鄉":{"幸福家園":93531},"南投縣|南投市":{"山水興匯":107818,"悅森活2期":45491,"首富成功":108087,"市榮菁選集":19508,"中龍天匯":115374,"德鼎謙聚":19678,"日日好境":103831,"廣宣-甲第":112381,"四季花園":58743,"廣宣-空間大師":57143,"聯眾．品玥":4000,"文化新貴":5714,"瀚霖森活":51042,"悅森活3期":23810,"拓璞天藏":95238},"台中市|龍井區":{"豐禾年年":128197,"茂洋馥域":284004,"合總峰光-極光區":182857,"欣興莎田":238095,"鋮豐富穥":142857,"德光大智":510824,"茂洋晴山洋洋":207619,"鉑金府":142857,"田庄吾寓":83810,"喬立浥品":120438},"彰化縣|二林鎮":{"元茂築幸福":103354},"彰化縣|員林市":{"國雄楓丹白露":513317},"台中市|太平區":{"聚佳大值":566969},"彰化縣|大村鄉":{"村上春墅":85545},"彰化縣|埔鹽鄉":{"順澤華廈":32839,"惠星享家3":37951},"彰化縣|永靖鄉":{"鉅佳晴大院":68810},"彰化縣|鹿港鎮":{"富旺市鎮香榭":459762,"長青易居NO.5":42857,"青成康堤":113089,"領先大和二期":5040},"彰化縣|福興鄉":{"泰銓翡翠苑":28571},"台中市|大肚區":{"里仁唯美2":394215,"茂洋旭美":171429,"茂洋閱美":207619,"昇佳閤邑":74309,"悦里仁5":75790},"彰化縣|花壇鄉":{"泰和茂昕城":162518,"郡里仁":55000},"南投縣|竹山鎮":{"大和青森(透天)":28571,"欣見築2期":23810,"大慶禾豐":5388},"彰化縣|彰化市":{"山水豐禾II":53809},"南投縣|草屯鎮":{"允將建設博愛路案":15984},"台中市|東勢區":{"綠誠勢2":95238},"彰化縣|埔心鄉":{"泰和茂桐心員":60000}},"陳琬臻":{"彰化縣|花壇鄉":{"橙豐天境":2939,"大樣城美":85107,"格睿松花苑":47619,"大牛傳奇2":16049},"台中市|西屯區":{"市政壹號廣場":2625316,"碧城FJ TOWER":411426,"遠雄洄山行":380952,"大樁園8":231190,"赫里翁城堡":136190,"勝美上安":2616699,"惠田映悅":285714,"尉寶大敦主人":219048,"逢甲101 No.2":89702,"怡山自在":100000,"德鑫協和":428571,"臻和康和玥":83810,"宜園 一青隱":55000,"蘿曼蘿蘭":150000,"富旺天際W ONE":40000,"麗晨片片山閑":14460},"彰化縣|員林市":{"首華謙富":1874,"昌祐員林大道":7307,"御品院":19742,"員林A1 晴逸心苑(華廈)":93242,"坤悅原鄰薈":726721,"青禾苑":20952,"逸竑逸璟":95238,"七碩市政廳":88571,"磐石帝堡VII":75934,"南平雅居":38096,"昌祐iHome":52381,"逸竑逸心":144872,"安家2":28463},"台中市|太平區":{"長平kotikoti":493819,"坤悅涵仰":929972,"順天蘊華":140952,"麗馳麗景16期":499524,"麗馳麗景No.16":210476,"和宜上美":142857,"大樁陶然園":140547,"鴻邑璞樹謙里":604779,"穩喬澄里2":110000,"蓉稼映美墅":53715},"南投縣|草屯鎮":{"誠悅草厚森":61653,"水琉璃":266917,"昌祐敦和":700632,"富宇富森林":214362,"晴耕雨讀":27785,"幸福臻愛":425952,"大名人光輝(公寓)":72857,"嘉冠青漾":19048,"碧山先生3":11429,"白鷺悠悠":26190,"市榮璞玉":12381,"現代首璽8期":20863,"群合iDo":40550},"南投縣|埔里鎮":{"悅悅大成":109286,"群山易居":91619,"元建築山蒔粼粼":19335,"薇閣美地13":57115,"幸福大邑":90000,"寶湖日日":56039,"視界Sè-kài":66666,"晨美NEW天嵐":33333},"台中市|西區":{"泉宇丰格":101640,"鈺陞御品":50400,"富旺千蘊":284018,"築優心晴":43265},"彰化縣|埔心鄉":{"賞自在":227664,"拾心":41142,"堡量豐華梧居墅":104762,"有春承青田熠心":47619,"頭等艙25期":12254},"台中市|中區":{"DE左岸":11904,"時代公園大廈-DIAMOND TOWER":80343,"鴻邑瑞錦":204000},"台中市|南屯區":{"豐邑泊金灣":575785,"惠田璞悅":819047,"豐邑建設五權西路案":54610,"亞昕織御":410514,"順天NEVERLAND 夢·島":295307,"和宜真美":269537,"精銳LEAD":123810},"彰化縣|彰化市":{"新都峰":186948,"德鑫泰和":176190,"世外桃源":9524,"嘉磐頤和":92857,"陽明學苑":9184,"福竹御所":14286,"合新中正一綻":34623,"泉宇大御":1802,"中山富域":55000},"台中市|北屯區":{"永尚承真":238095,"帝璟寬和":895237,"登陽華境":182857,"漢宇雲衍":285714,"惠田樹語靚":336190,"登陽華馥":605714,"惠田好日子":384163,"熊圖建設仁平段案":106617,"熊圖敘Dos":37810,"原潮APT":63000,"豐邑太原YES":63000,"華固四季滙":532357},"台中市|神岡區":{"葫蘆墩Golden Park":169524,"逸竑逸築":141050},"彰化縣|芬園鄉":{"裕鑫豐悅No.2":47619},"彰化縣|秀水鄉":{"堡量風華21":14286,"幸福之星":82532},"台中市|":{"啵比星球":285714,"LAKESIDE GARDEN":137000},"南投縣|南投市":{"潞鼎蒔雲":20000},"台中市|東區":{"聚悅臻心":215400,"允將沐溡":498096,"浩瀚湖濱城":554078,"璞翫寓所":54319,"謙18":110000,"宏廈青川":66000},"台中市|沙鹿區":{"惠國麓境":1089951},"台中市|大甲區":{"幼獅海灣":40000,"大甲湛":33600},"台中市|大雅區":{"坤聯發大雅匯":285714,"大雅之堂":110476,"大雙喜18":45782},"台中市|豐原區":{"久樘雋陽":223809},"彰化縣|大村鄉":{"大村A3":56190},"台中市|潭子區":{"勝發賀":882058,"聚佳豐美":238095}},"趙紹亨":{"台北市|北投區":{"士科大院.":3082502,"琢月":334457,"一目辰":156845,"樺輝沐畇":156643,"千百度":891886,"聯鉅北投湛":19265,"達麗河藴":849820,"士科之芯":342858,"力方越":95238,"遠雄泱玥":523809,"達欣文萃":438095,"齊興_緻":330600,"泉隱村":32000,"佳元織川":323143,"洰賦":51156,"鄉林靜岡":37714,"聯上智科":42857,"昇陽麗鉑":127484,"遠雄商舟":190476,"龍霖初心":246874,"華固芙心":218500},"新北市|永和區":{"頂溪大苑":266304,"新碩永傳":350476,"M PLUS":380952,"比漾好境":144000,"敦南宴":95238,"漢皇River Sky":166667},"基隆市|中正區":{"御景硯":104629,"儒院":35657,"僑家大院":494998},"基隆市|中山區":{"青森之丘":512941,"瑞揚景綻":23368},"新北市|淡水區":{"合康植芯":736646,"天藝":956217,"青澤-蒔光泊旅":1435194,"台北灣 銀河":2648053,"水美慕河":341360,"嘉潤家泰氧之森":285714,"名軒海樂地":1294156,"鴻灃COMO":772702,"員邦徊":856250,"村泉蒔美":552381,"寬玥":945556,"岳泰峰碩":190476,"海帝":53700,"致茂橋豐":323809,"天水一墅":568,"大隱小藍海":29562},"新北市|八里區":{"春城新港灣":388281,"大新田幸福之森":285714,"豐邑港麗":160993,"八里龍躍":14280},"基隆市|暖暖區":{"甲山林城上城2-美麗上城":239311},"新北市|中和區":{"太陽帝國":214822,"君奕華品":190476,"和典永峰":142857,"冠德心禾匯":1146571,"漢皇方圓":533333,"永邦恆美":285724,"好植":198095,"冠德K TOWER Y09":192550,"漢寶捷運學府No.5":64448,"左岸明珠B基地":77482},"台北市|南港區":{"東方大境":3265499,"中研硯":380952,"玫瑰騎仕":438095,"南港國際SKY PARK":142857,"中工雋詠":190476,"雄邦序曜":202000},"新北市|汐止區":{"永富御":742857,"朗朗晴":333333,"富都康莊":238095},"台北市|士林區":{"久年松芮":366667,"溪泊林":138096,"圜寬 蒔嶼":190476,"天母品川B棟":285714,"璽琚":190476,"甘霖僑琚":190476,"豐萃":365415,"漢皇韶光":335316,"松陽沐雲":205857},"新北市|新店區":{"昇峰安曼":413130,"協富青睞":40000,"寶安JR":190476,"敦南之森":1129764,"寶鈺":1167026,"友座明明德":475247,"東基M1":171429,"敦泰苑":63000,"華固譽誠":212800},"基隆市|信義區":{"富泉II":12224},"基隆市|安樂區":{"幸大新東區":188290},"新北市|三峽區":{"北大悠揚":300000},"基隆市|仁愛區":{"峰品琚":41437}},"彭莉芳":{"苗栗縣|竹南鎮":{"雙學苑":8610,"宜誠日沐":67413,"朋晨和心":188713,"三顆糖":11062,"新業恆一":4206,"美亞智富":229682,"東淯SHINE":51262,"蒔序":22858,"富比樂":171429},"苗栗縣|苗栗市":{"瀧淳天玥":2907,"喜苑":25057,"好寓兆6-華廈區":97814,"日和豐穗2":34286,"陶璽7弘大賞":13334,"寓 見山":47620,"瀧淳玥華":21215,"馥靚":43000,"尊爵七期":19026,"麗天.雲朵":2952},"桃園市|楊梅區":{"豐禾":45000,"櫻花馥":1314881,"全新綻5":24490,"夢想御墅":110619,"和平大院":341905,"翊翔家":47620,"森之昕":255714,"格律美-華廈區":255948,"綻美-大樓區":66667,"寶台青耘":408915,"龍騰綠境":114286,"安心學(A+B+C)":97619,"佳昕昕藝":349933,"站前旭":76190,"嶄邑湖漾":25000,"宥騰青水漾":200000,"太平洋陽光四季臻美":23810,"慢慢莊園-大樓區":195788,"豐禾2":185143,"宜誠中山北":176667,"藏玥":23810,"荷蘭小鎮":23810,"尚虹Hi樂":154215,"富春":47620,"小紅帽的家-透天區":162059,"印象．天青":104762,"全新綻6":33000,"誠聚星智選":100340,"太禾良品":177860,"慶升森·森品":37143,"楊湖聚昕":101450,"郡鼎御璽":58611,"廣昱青澤":60000,"慶賀天合":2143,"笙鋐耘翠":61200,"長富御都-公寓區":5624},"新竹縣|湖口鄉":{"富旺耀時代VILLA":351199,"富旺耀時代":381665,"富寓":97479,"遠揚‧居易":3528,"福田雲蔚":38571,"京漾":86395,"御水岸":141442,"陶然莊":680,"璞石":7347,"美禾柿":98019,"力成悅豐":98047,"力成墅泱泱":106247,"康和大院":23238,"春福BeTwin":291428,"樸光音":29431,"馥.寓所":207440,"禾璟苑":214536,"新祐京壐":72091,"佳群城真":57143,"湖心繪":285714,"東展十美":42857,"鼎極築賦":26666,"宸易":32380,"嘉梁凰尊6":13333,"遠揚居易Ⅱ":15238,"長富御都-公寓區":38143,"悠然居":18567,"益欣悠陽":14285},"新竹市|北區":{"藝居-華廈區":36000,"沐禾觀美":142218,"嶼在":13379,"鴻藏":82766,"朋晨和禮":276190,"富宇天闊":285714,"春福水硯":350476,"創礫AI":187389,"日光聚":183618,"鴻碩":11429,"鴻萃":11429,"聚吉第":28571,"安欣3":28571,"富宇天湖":50745,"昌昕森林首席":95238,"大道首席":95238,"凱歌莊園":221477,"幸福雄郡No.17":16190,"光華時上":100400,"臻品天下":28571,"沺境":101788},"苗栗縣|公館鄉":{"青川敦品":7389},"苗栗縣|苑裡鎮":{"翔賀居17期【新復里】":14776,"金寓藍田":786,"城市光點3.0":13333},"苗栗縣|造橋鄉":{"御上苑":26860},"苗栗縣|頭份市":{"富88":26860,"富御珍藏":11664,"新天地6":49274,"馥郁吉第2森HOME":52944,"亞昕中央大道":161905,"光華盛璟":57142,"里享2":13976,"中正人文":180000,"雲天青境":142857,"昌隆廣場-勝好":142857,"智宇森活-透天區":39524,"新航綺飛":47619,"創麒城曦":332518,"仰森大境":64458,"太睿四季":47619,"語漾峇里島":47619,"群悅泱漫":39184,"富麗賀":269850,"樂易GO":40400,"惠宇新聚":103500,"帝賦5":17092,"八德盛景":10858,"築道雙星":11460},"新竹縣|寶山鄉":{"宏道新竹帝寶7區1號-華廈區":147569,"富宇天湖":234969,"寶山曼尼3":11429},"新竹市|東區":{"科技之心":1400,"成熟大人":33904,"雲端·雲峰":128639,"富宇天雋":285714,"春福承曦":334148,"雲端·雲起":59643,"鴻上":11429,"翡麗琚":142857,"金鋐.琢岳":185714,"金弘天希":185714,"鴻柏鴻序":97347,"瑞聚煦煦":36190,"泰寓靜雅居":103953,"竹慶嶾見":72292},"桃園市|平鎮區":{"和峻上中央":815382,"悅峰甜蕃茄":57143,"滙盈千江墨":28571,"聯懋日日青":351652,"延隆蒔光":167143,"百川文玥":142857,"創緯天藝":103710,"幸福森鄰":21089,"雋益雋":22143,"義澍品硯":225000,"小紅帽的家-透天區":6248},"苗栗縣|後龍鎮":{"高鐵名邸2":52226,"新站締寶2":117857,"高鐵名邸3":38095,"後龍新世代3":58295,"騰元和砌":7620,"藝墅家":55950,"矽谷道":40050},"新竹市|香山區":{"宏邑玥上川-大樓區":285714,"幸福雄郡NO.11":13333,"吉壹庭琚":45714,"元幸福-大樓區":73333,"鑫陞砳昕":100050,"閑谷NO.8":100200,"凱歌莊園":6072},"宜蘭縣|員山鄉":{"南山居-大湖":85714},"苗栗縣|銅鑼鄉":{"溢家 CITY ONE":114286},"桃園市|龍潭區":{"石門雲裳の石門。湯玥":19048,"石門掬月":185033,"嵐庭旭":23810,"宏觀舞":42000,"幸福山丘2":276190,"承崴綻5":95238,"勤源青崧居":52381,"拾山":95238,"伯爵名門":47619,"豐中城":124400,"喬成大境":40189,"森學苑":66142,"和禾耘":41000},"桃園市|大溪區":{"元臺聚":126429,"齋明居":57143,"森巴黎18期":25000},"新竹縣|新埔鎮":{"禾堉大境":195949,"力成漾":66667,"京茂四季-大樓區":95238},"台南市|北區":{"成大之森":48840},"高雄市|楠梓區":{"白隅":95238},"台中市|西屯區":{"達麗拾穗":7145}},"黃淑萍":{"桃園市|桃園區":{"竹城東京都":303067,"悦讀伊頓":1297584,"宜誠天玓":513313,"宜誠謙里":92096,"百川峰滙A":53571,"立信W Modern":706706,"益騏新画峰":84014,"上宏囍玥":345250,"麗寶南法莊園-普羅旺斯":331580,"亞昕森丰":759342,"葛里法7":380952,"君邑富永":39700,"大和御品苑":2076668,"康駿藝靜":53000,"中悦松花園":397000,"麗寶南法莊園-霞慕尼":1189815,"衡美沚":190476,"璟都中路大苑":285715,"嘉璟悅河":285714,"展志縱橫時代":173810,"時代之星":25924,"遠傳SKY GARDEN":428571,"國泰GRAND PARK":207350,"大和仰慕":1209175,"可頌":76190,"耑悦":357143,"春虹.在壹起":288190,"杭特立":362875,"川云":33000,"國際ONE":65205,"匯聚-未央區":133333,"宜雄盛筵":285714,"岳虹知序":190476,"新潤-安曼莊園":1632036,"中路之星":19000,"宜雄森厚":104390,"藝青山":30152,"悅佳謙悅":42177,"鴻築湖適":50000,"京懋有方":100000,"昕和一瑀":63000},"桃園市|龜山區":{"富宇上城":108054,"富宇富御":122607,"豐邑Green iN":133878,"鴻築捷市閱":300000,"里豐景":333333,"幸福馥都心":62553,"長堤天昀":553888,"長虹擎山":428571,"竑鈦晶采":114286,"英倫花都":639121,"幸福森鄰":243846,"大亮睦粼":937142,"秉和芊遇":50000},"新北市|泰山區":{"地景富邑":22236},"新北市|新莊區":{"日健居":0,"勝旺新":891794},"桃園市|八德區":{"德瑞和平文苑":202497,"幸福馥都心":1714018,"聚東村":366286,"深耕13":180000,"合雄大境":190476,"達運敦沐":285714,"佳昕.昕綻":266667,"三本皇琚":285714,"益騏豐盛御境":142857,"玖登春樹醴":100000,"君臨美超":47009,"京格首璽(松露花園)":60000},"宜蘭縣|五結鄉":{"人文首富No.41":96114,"富森‧華廈":27000},"宜蘭縣|蘇澳鎮":{"The Taurus 金牛座":110657},"宜蘭縣|頭城鎮":{"覓蒔光":6000},"宜蘭縣|礁溪鄉":{"仁愛映巷":126477,"桂冠-礁溪帝堡":17000},"桃園市|蘆竹區":{"卓悅水美":95238,"和耀四季":259790,"鵬躍瀞":254742,"君臨．大美":189810,"宗佳致境":101100,"君臨郡美":23429,"高鐵馥境":29143,"皇普MOMA":6496,"築園心蘊":212988},"台北市|信義區":{"國泰產險":330000,"財金門轉":152381},"花蓮縣|花蓮市":{"超綻":71429,"全聯當舖":9000},"宜蘭縣|宜蘭市":{"桂冠公園1號院":17000},"桃園市|平鎮區":{"幸福森鄰":260000}},"姚蘋芸":{"高雄市|三民區":{"綠廳院":551205,"MAX":77280,"鼎美CASA":127381,"尊邑 Rich One":239798,"述風景":30804,"京城馥の森":1225334,"遠雄沐蘊":380952,"陽明第一廳":579281,"詠光":36209,"艾美松":1010102,"遠雄峰蘊":376190,"福懋美森園":285714,"宏森·綻":238095,"光洲耘朗":140952,"和紘大景旭":148181,"艾美國際城":197857,"上水":42857,"京城 新世界":60189,"樹藤建設":199800,"靚陽明":319342,"聯茂知裏":310265,"城揚Twin S":114286,"國泰明誠":142857,"遠見云峰":282294,"無雙":95238,"景城":56000,"齊樂":159438,"和築豐彩":4808,"寶象藏三豐":32295,"大昌九禾":54000},"高雄市|鼓山區":{"惟美術":725561,"京城美術皇居":876190,"美術1808":380953,"美廳苑":736838,"滙埕":245476,"尚觀山房":114286},"屏東縣|萬丹鄉":{"龍大吉":101133,"麗晶ONE":71429,"樂苑萬丹":59912,"綠美墅":57142,"福砌2":214490,"森境莊園":57143,"慕藍":123809,"皇城陛廈":114286,"慕光19期":14476,"皇家旺市2-1期":36191,"香墅":6171,"富春麗苑":4371},"屏東縣|屏東市":{"澤曜 · 好 young":15875,"勝利之星":33228,"萬吉謙山":32565,"民生愛樂":45007,"傳寶":174374,"鑫想事成2":14971,"昱達豪邸":13200,"躍祥-清風引":19048,"明正金鑽":24381,"時尚領袖":57143,"安庭民生":90433,"總圖大連":67963,"景湛":27771,"中洲ONE PARK":16920},"高雄市|小港區":{"豐嶸大境2-大塊山水":167315,"興璽智慧宅2":48571,"五馥桂":28571,"富麗居七期":108000,"曜安庭":467935,"知鹿森林":47619,"松露大地":42143,"曉丘":160552,"筑光日居":111497,"百達宏邸":85714,"偕富五居":20000,"吉泰,然":90476,"光之賦":40000,"清景麟國家公園":173250,"富城":33614,"築印18-墅沐":22000,"森植苑":31360},"高雄市|前鎮區":{"夢享家2":561402,"THE ONE":476190,"英倫亞灣2期":279094,"嶼BAY HAUS":676190,"璟HOLA":285715,"亞灣晴天":23808,"京城 新世界":724633,"舞峰":85713,"亞灣好好":28000,"鳳凰悦":708406,"百達灣品":105714,"大船入港":215986,"築悦":10438,"賦語":55000},"屏東縣|崁頂鄉":{"晴空墅2":54718},"高雄市|大樹區":{"大墅甜心":106577,"捷安天下2":55238,"義大皇家山莊":85714,"皇城御賞":380953,"荷蕥墅":20000,"大樹鳳承":16500},"高雄市|前金區":{"豐邑TOP+":671874,"星峰匯":285714,"尊邑璞臻":281666,"京城凱悅":76190,"立有迎新":44412},"屏東縣|長治鄉":{"禾硯 . 墨砌":87791,"良悅一方":91659,"白上白2":45007,"嵩陽建築 璽悅":59842,"安佑森學":43572,"良悅一方-透天":26898,"一起悠活":33684},"屏東縣|東港鎮":{"英倫晴森-6":131800,"欣囍臨門":28571,"東津灣":78143,"川其晶渼":14286,"東港ONE":95238,"U-Sense優時尚":35218,"晟佳-長居八期":13244,"青禾鎮-華廈":33121},"花蓮縣|花蓮市":{"沐谷上流":47961},"屏東縣|新園鄉":{"好嘉園":15086,"春木心緣":76429,"皇家海悅2-華廈":279817,"怡華文學苑":30476,"淇發寸白":38096,"新園捷邑":42857},"高雄市|大寮區":{"富第":181762,"上揚誠":190476,"松藝家":330148,"Park夢":25000,"御學苑":25000,"自由式":112381,"高人一等27":282900,"觀悦行館NO.18":57143,"潮好住":95238,"昱大鳳鄰":47619,"捷安居6期":40000},"高雄市|林園區":{"逸品家圓":313828,"艾美藏":85714,"豪樂邸-透天":100000,"磐京臻璽No.15":109524,"一琚隱園":57143,"林園聚富":5532},"高雄市|新興區":{"利融藏御":190476,"美麗馥品":145892,"皇逸居":1323},"高雄市|湖內區":{"城安大未來":256074,"村樹六富":33333},"高雄市|苓雅區":{"逸文苑":130935,"聯上鉑麗":47619,"京城舞極":1117189,"水精湛NO.2":238095,"若谷":47619},"屏東縣|南州鄉":{"研一鴻喜":12900},"高雄市|彌陀區":{"家和萬世‧6":70751},"高雄市|梓官區":{"龍鉅毓未來":334057},"屏東縣|新埤鄉":{"綠心嵩":71517,"上賀":57143},"屏東縣|竹田鄉":{"達觀莊園":59180},"屏東縣|九如鄉":{"知故里":14600},"屏東縣|佳冬鄉":{"耀佳冬-華廈":14600,"元皇佳家":33333},"高雄市|":{"天玉集團龍騰建設":552533},"屏東縣|萬巒鄉":{"晴天Villa":57143},"屏東縣|麟洛鄉":{"澤曜 . 好湛":28804},"高雄市|鳳山區":{"花町院":34628,"幸福居9":12143,"保泰一品":9000},"高雄市|左營區":{"小森學":16837,"芳崗高鐵棧":13080},"高雄市|楠梓區":{"高大之森2高大之上":167193,"遠雄一靚":7615,"博市陞":36091,"成宇-名仕鈺苑":5447,"以學MDT":37800},"高雄市|橋頭區":{"邑信城邑":17143,"聚寶家綻":5843},"高雄市|仁武區":{"遠見沐景":150000,"開遠綠園GreenPark":21187,"澐之森":10902}},"仲綨柱":{"台北市|信義區":{"緻信義":193062,"信義誠家":1150722,"大隱青后":380952,"詠綸朔望":120000,"吉祥．如藝":752469},"台北市|內湖區":{"晶綻大直":151067,"碧湖雲景":1230748,"力麒·寰山":308424,"和暘夏灣":689858,"日 麗":322381,"金爵騎仕":638095,"麗湖琚":18252},"新北市|新莊區":{"芳草地":494722,"文華苑":931156,"富都馨":2095238,"勝旺新":2967088,"馥華之道":1163706,"國王大道KING PARK":1020407,"富都新玉-富都區":519457,"碧瑤敦灃":19048,"新月大河":707676,"仰悦":66667,"國家壹號廣場":250952,"寶亞鴻公舘":464388,"豐隆昕誠":109524,"春城麗都":190476,"昀集富昱":95238,"禾蓮心中美":40000,"福美富琚":142813,"本格明水":24286,"河成心湛":42000},"台北市|大安區":{"連雲雲恆":46857,"沃和":401857,"亞昕敦南":521255,"大安ONE":703841,"親家JIA":855049,"寶舖全健築知行":1050020,"志榮BR4":534474,"三創爵鼎":338094,"安和自在":625614,"大安茗邸":20000,"敦南琴朗":171429,"合砌雲開":47000,"敦南詠楽":142857,"富裔巨蛋":560312,"山川不白":190476,"統創翼":55000},"新北市|泰山區":{"閱讀台灣":447643,"合嘉楓疆":758095,"地景新世代":904830,"百達莊園":139427},"宜蘭縣|蘇澳鎮":{"龍德雅苑":8800},"台中市|西屯區":{"達麗拾穗":10003}},"楊儀菲":{"高雄市|鼓山區":{"美廳苑":29120},"新竹縣|竹東鎮":{"富宇東方大境":285714,"富廣夢溪石":158450},"新竹縣|竹北市":{"富宇森之樹":285714,"琢悅2":28000,"雙城一號":78905,"今天之外":348130,"名發 天琚":71429,"青溪賦":95238,"美邑初蘊":243667,"名發天琚":69524,"品創墨品":57143,"久煜展閱":21294,"青松-華廈區":77074,"綠光森霖":42857,"豐邑之森":33333,"蒔光APM":33333},"苗栗縣|竹南鎮":{"富廣ONNI":269047,"雙學苑":153100,"知禮序":105131,"宜誠日沐":171429,"東淯SHINE":208305,"蒔序":26668,"亮晶晶":42857,"新業恆一":47619,"里宿":28572,"印象大境":66667,"福德美居":110476,"朋晨和心":341078,"築立方":90476,"與山前":42857,"築美2":113442,"雲朵朵-華廈區":87619,"明日寓所":74286,"三顆糖":36190,"富比樂":314129,"美亞智富":314179,"民生1號":55714,"帝賦3":28571,"家藏美8":29524,"日日煦":23810,"微新生活":40200,"富來旺":31424,"大埔之上":771},"新竹縣|新豐鄉":{"心豐花園":127619,"青庭":85714,"豐禾":205630,"宜克拉":95238,"聯懋萃豐苑":190876,"森祐傳承":40952,"廣僑樹No.5(華廈區)":32762,"寧境二期":37306,"畫新妝":100350,"覓境":20000},"苗栗縣|苑裡鎮":{"發現苑麗":243030,"大雲藏富第二期":19048,"豐年":181906,"金寓藍田":71429,"艾麗":85729,"城市光點3.0":53334,"Livinn 逸居":25905,"薪泰田":19910},"新竹縣|關西鎮":{"幸福家家":30476,"瑞晟-敘森林":42484},"苗栗縣|公館鄉":{"青川敦品":87619,"勤家No.3":21000},"新竹縣|橫山鄉":{"墅沛NO.11":85000},"桃園市|觀音區":{"樹家園":238095,"全新墅2":70500,"建家云玥3":80000,"和發首映":729582,"新亦品":158095,"築家":238904,"靚室代":118294,"新亦湛":407933,"凱田藝境":52381,"旭日矅":25000,"悅世界2":80953,"大觀梧双":125714,"嘉禮綵裕":23810,"嚮未來-蒔美":379476,"大和園":71190,"曉日-C區":104096,"雄讚家NO.5":115006,"璟都璟湛":219046,"傑安築夢家":83714,"大清仁愛錄":133963,"聯澄序":109524,"昊司霆苑一期":118600,"鑫帝境":209990,"全新湛":28000,"城心ONE":120857,"紳騰璞苑":63787,"臻馥寓":100850,"全新湛2":22500,"郡鼎佳禾":33429,"家州丰逸居":25000},"新竹縣|芎林鄉":{"竹科主人10":142857,"文山匯":60000},"苗栗縣|銅鑼鄉":{"御鼎六期":61905},"桃園市|新屋區":{"勤本映月":64714,"勤本青町":64714,"印象∙好好":90000,"大清夢想家–華廈區":120857,"九豐花園":102100,"墅耕":27143,"勤本詠恆":19000,"青恬":57143,"東柏-朗居":25000,"德尊-樂馥":25000,"國岩琚":17500},"新北市|板橋區":{"芯哲園":47619},"苗栗縣|頭份市":{"仰森大境":52200}},"翁嘉妘":{"台南市|安南區":{"莊園8-八富":85714,"連建大賦":85714,"三富樂樂":142857,"海富深見":171429,"邰欣地堡100期-透天":142858,"邰欣地堡79期":140953,"天鑽":50400,"敘禾苑":70000,"清景麟 美學":95238,"時美":28000,"嶺秀":171429,"宜室感":57143},"高雄市|燕巢區":{"藏逸11":25000,"洄燕潮":28571},"高雄市|旗山區":{"旗山一號院":55442}},"李抒姮":{"宜蘭縣|礁溪鄉":{"鳳凰愛買11-阡荀":17600,"蘭田遇":88600,"ONSEN昂森晴":14000,"水野路路(華廈區)":103048,"歡喜家園no.25":23878},"宜蘭縣|宜蘭市":{"謙君":38400,"浦田森陽":16762,"大琚":72456,"皇程首賦":27767},"宜蘭縣|員山鄉":{"香榭麗舍9":38332,"築荷5":22381,"文風翠庭第21期":19600,"舒美圓山":6171,"南山居-大湖":42667},"宜蘭縣|頭城鎮":{"嶠見築":14800},"宜蘭縣|三星鄉":{"得墾之心":14800,"安農秘境II":54400},"新北市|蘆洲區":{"當代集賢-琢謙":30000},"宜蘭縣|五結鄉":{"佳荷3":13333},"宜蘭縣|羅東鎮":{"力信擎朗":137131},"宜蘭縣|冬山鄉":{"幸福苑-華廈區":22720,"鳳凰愛買19期-龍上川":7200,"美澍川NO.9":27000,"鳳凰愛買21期-滿綠意":11755,"幸福苑-透天區":1768},"宜蘭縣|壯圍鄉":{"鳳凰愛買18期-稻香美城":6857}},"郭宴菱":{"高雄市|大社區":{"常悅":25000,"吉人滙":177857,"春陽逸居":41400},"高雄市|路竹區":{"隱院2":27143,"日日．澍陽":20000},"屏東縣|麟洛鄉":{"富苑":13107},"屏東縣|潮州鎮":{"天景潮院":6171,"幸福168(華廈)":6171,"晴美築":771},"屏東縣|內埔鄉":{"和昌峰采2":6171,"皇家欣天地5-透天":6613}},"趙斯蓓":{"宜蘭縣|五結鄉":{"人文首富No.41":43971,"富森‧華廈":36000,"夢想家園第五期":26357,"怡華艾菲爾":12000,"文創之星":1700,"樂沐":1700},"宜蘭縣|蘇澳鎮":{"好室多":183485,"卓閱":11429},"宜蘭縣|頭城鎮":{"晏京山海序":95238,"享享生活":6000,"宜林臻品":10476},"新竹縣|關西鎮":{"享嘉樂樂":47619},"新竹縣|芎林鄉":{"文山集":75000},"宜蘭縣|壯圍鄉":{"古亭郡2":9400,"耘光":14286,"新元墅9":11760,"新家源源翠大苑":14026},"宜蘭縣|冬山鄉":{"高第 花得芙":51850,"掬月5":5600,"旭川2":20408}},"張瑋秦":{"花蓮縣|吉安鄉":{"磬揚合靜":5600,"匯安家":2571,"唐邑禾光":3221},"花蓮縣|花蓮市":{"沐谷上流":28571,"大翰藏峰":33221,"美崙海悅":19000,"上寬好室":47619,"東金沐":58600}},"程鈺雯":{"台中市|北屯區":{"富宇藏富":0},"新北市|三重區":{"鼎藏豐碩":0}},"陳怡雯":{"新北市|土城區":{"合康雙匯":50000,"朗沐L'AMOUR":38348,"迴東騰":19371,"松陽馥麗":10690},"新北市|蘆洲區":{"河悅花園":141850,"一品滙":69761,"崇利華漾":25971},"新北市|樹林區":{"欣懋川玥":150558,"米蘭敦品-新貴區":67502,"敦美開發復興路案":5072},"新北市|鶯歌區":{"渼麗綻":91406,"京澄為德":76237}},"楊君柔":{"桃園市|桃園區":{"璟都中路大苑":44275}}};
+
+// ══ State ══
+let rawFile=null,onlineFiles=[],rawRecords=[],onlineMap=new Map(),data26Unit=null;
+let currentFeat='pen',penDim='ag',unitDim='ag';
+
+// ══ Detail store ══
+const det={};let detN=0;
+// type: 'names' → items=string[], 'revs' → items=[{p,r},...]
+function storeNames(namesSet){
+  const k='n'+(++detN);
+  det[k]={type:'names',items:[...(namesSet instanceof Set?namesSet:Object.keys(namesSet))].sort((a,b)=>a.localeCompare(b,'zh-TW'))};
+  return k
+}
+function storeRevs(projRevMap){
+  const k='r'+(++detN);
+  det[k]={type:'revs',items:Object.entries(projRevMap).map(([p,r])=>({p,r})).sort((a,b)=>b.r-a.r)};
+  return k
+}
+let _modalData=null;
+
+// ══ Upload ══
+function onRaw(inp){rawFile=inp.files[0]||null;document.getElementById('card-raw').classList.toggle('done',!!rawFile);document.getElementById('lst-raw').innerHTML=rawFile?`<div class="file-item">✅ <span>${rawFile.name}</span></div>`:'';refreshBtn()}
+function onOnline(inp){onlineFiles=Array.from(inp.files);document.getElementById('card-online').classList.toggle('done',onlineFiles.length>0);document.getElementById('lst-online').innerHTML=onlineFiles.map(f=>`<div class="file-item">✅ <span>${f.name}</span></div>`).join('');refreshBtn()}
+function refreshBtn(){document.getElementById('calc-btn').disabled=!rawFile}
+function readWb(file){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=e=>res(XLSX.read(new Uint8Array(e.target.result),{type:'array'}));fr.onerror=rej;fr.readAsArrayBuffer(file)})}
+
+// ══ Parse RAW (penetration) ══
+function parseRaw(wb){
+  const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+  let hi=-1;for(let i=0;i<6;i++){if(rows[i]&&rows[i].includes('產品名稱')){hi=i;break}}
+  if(hi<0)throw new Error('RAW 找不到「產品名稱」欄位');
+  const h=rows[hi],cU=h.indexOf('產品名稱'),cV=h.indexOf('建案所在地'),cW=h.indexOf('建案行政區'),cX=h.indexOf('業務'),cY=h.indexOf('業務團隊');
+  const out=[];
+  for(let i=hi+1;i<rows.length;i++){const r=rows[i];if(!r)continue;const p=r[cU];if(!p||String(p).trim()===''||String(p).trim()==='(無)')continue;out.push({project:String(p).trim(),county:r[cV]?String(r[cV]).trim():null,district:r[cW]?String(r[cW]).trim():null,agent:r[cX]?String(r[cX]).trim():null,team:r[cY]?String(r[cY]).trim():null})}
+  return out
+}
+
+// ══ Parse RAW (unit price) — stores projRevs maps ══
+function parseRaw26ForUnit(wb){
+  const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+  let hi=-1;for(let i=0;i<6;i++){if(rows[i]&&rows[i].includes('產品名稱')){hi=i;break}}
+  const h=rows[hi];
+  const cS=h.indexOf('客戶 - 產業'),cU=h.indexOf('產品名稱'),cV=h.indexOf('建案所在地'),cW=h.indexOf('建案行政區'),cX=h.indexOf('業務'),cY=h.indexOf('業務團隊');
+  const revCols=[];for(let i=0;i<h.length;i++){if(h[i]&&String(h[i]).includes('月業績'))revCols.push(i)}
+  const agents={},counties={};const allPR={};let allRev=0;
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i];if(!r)continue;
+    const s=r[cS],u=r[cU],v=r[cV],w=r[cW],x=r[cX],y=r[cY];
+    if(!s||!String(s).includes('房產'))continue;
+    if(!v||String(v).trim()==='')continue;
+    if(!u||String(u).trim()===''||String(u).trim()==='(無)')continue;
+    const proj=String(u).trim(),county=String(v).trim(),district=w?String(w).trim():'';
+    const agent=x?String(x).trim():'(未知業務)',team=y?String(y).trim():'(未分組)';
+    const rev=revCols.reduce((s,ci)=>s+(typeof r[ci]==='number'?r[ci]:0),0);
+    const dk=county+'|'+district;
+    allPR[proj]=(allPR[proj]||0)+rev;allRev+=rev;
+    if(!agents[agent])agents[agent]={team,allPR:{},allRev:0,districts:{}};
+    agents[agent].allPR[proj]=(agents[agent].allPR[proj]||0)+rev;agents[agent].allRev+=rev;
+    if(!agents[agent].districts[dk])agents[agent].districts[dk]={PR:{},rev:0,county,district};
+    agents[agent].districts[dk].PR[proj]=(agents[agent].districts[dk].PR[proj]||0)+rev;agents[agent].districts[dk].rev+=rev;
+    if(!counties[county])counties[county]={PR:{},rev:0,districts:{}};
+    counties[county].PR[proj]=(counties[county].PR[proj]||0)+rev;counties[county].rev+=rev;
+    if(!counties[county].districts[district])counties[county].districts[district]={PR:{},rev:0};
+    counties[county].districts[district].PR[proj]=(counties[county].districts[district].PR[proj]||0)+rev;counties[county].districts[district].rev+=rev;
+  }
+  const teams={};
+  for(const[ag,d]of Object.entries(agents)){const tm=d.team;if(!teams[tm])teams[tm]={PR:{},rev:0};for(const[p,r]of Object.entries(d.allPR)){teams[tm].PR[p]=(teams[tm].PR[p]||0)+r}teams[tm].rev+=d.allRev}
+  return{total:{n:Object.keys(allPR).length,rev:Math.round(allRev),PR:allPR},teams:Object.fromEntries(Object.entries(teams).map(([t,d])=>[t,{n:Object.keys(d.PR).length,rev:Math.round(d.rev),PR:d.PR}])),agents:Object.fromEntries(Object.entries(agents).map(([ag,d])=>[ag,{team:d.team,n:Object.keys(d.allPR).length,rev:Math.round(d.allRev),PR:d.allPR,districts:Object.fromEntries(Object.entries(d.districts).map(([dk,dd])=>[dk,{n:Object.keys(dd.PR).length,rev:Math.round(dd.rev),PR:dd.PR,county:dd.county,district:dd.district}]))}])),counties:Object.fromEntries(Object.entries(counties).map(([c,d])=>[c,{n:Object.keys(d.PR).length,rev:Math.round(d.rev),PR:d.PR,districts:Object.fromEntries(Object.entries(d.districts).map(([dist,dd])=>[dist,{n:Object.keys(dd.PR).length,rev:Math.round(dd.rev),PR:dd.PR}]))}]))}
+}
+
+// ══ Parse 在線建案數 ══
+function parseOnline(wb){
+  const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+  let hi=0;for(let i=0;i<4;i++){if(rows[i]&&String(rows[i][0]).trim()==='建案名稱'){hi=i;break}}
+  const h=rows[hi],ic=h.findIndex(v=>v&&String(v).includes('縣市')),id=h.findIndex(v=>v&&(String(v).includes('區域')||String(v).includes('行政區')));
+  const cC=ic>=0?ic:5,cD=id>=0?id:6,map=new Map();
+  for(let i=hi+1;i<rows.length;i++){const r=rows[i];if(!r)continue;const name=r[0];if(!name||String(name).trim()==='')continue;const k=String(name).trim();if(!map.has(k))map.set(k,{county:r[cC]?String(r[cC]).trim():null,district:r[cD]?String(r[cD]).trim():null})}
+  return map
+}
+
+// ══ 2025 detail helpers ══
+function get25PR(scope){
+  // scope: {type:'total'} | {type:'team',team} | {type:'agent',agent} | {type:'agent-dk',agent,dk} | {type:'county',county} | {type:'county-dist',county,district}
+  const t=scope.type;
+  if(t==='total'){const m={};for(const[ag,dks]of Object.entries(DATA_2025_PROJ))for(const[dk,pr]of Object.entries(dks))for(const[p,r]of Object.entries(pr))m[p]=(m[p]||0)+r;return m}
+  if(t==='team'){const m={};for(const[ag,d]of Object.entries(DATA_2025.agents)){if(d.team!==scope.team)continue;for(const[dk,pr]of Object.entries(DATA_2025_PROJ[ag]||{}))for(const[p,r]of Object.entries(pr))m[p]=(m[p]||0)+r}return m}
+  if(t==='agent'){const m={};for(const[dk,pr]of Object.entries(DATA_2025_PROJ[scope.agent]||{}))for(const[p,r]of Object.entries(pr))m[p]=(m[p]||0)+r;return m}
+  if(t==='agent-dk'){return DATA_2025_PROJ[scope.agent]?.[scope.dk]||{}}
+  if(t==='county'){const m={};for(const[ag,dks]of Object.entries(DATA_2025_PROJ))for(const[dk,pr]of Object.entries(dks)){if(!dk.startsWith(scope.county+'|'))continue;for(const[p,r]of Object.entries(pr))m[p]=(m[p]||0)+r}return m}
+  if(t==='county-dist'){const m={};for(const[ag,dks]of Object.entries(DATA_2025_PROJ)){const pr=dks[scope.county+'|'+scope.district]||{};for(const[p,r]of Object.entries(pr))m[p]=(m[p]||0)+r}return m}
+  return{}
+}
+function get25Names(scope){return Object.keys(get25PR(scope))}
+
+// ══ 2026 detail helpers ══
+function get26PR(scope){
+  if(!data26Unit)return{};
+  const t=scope.type;
+  if(t==='total')return data26Unit.total.PR||{};
+  if(t==='team')return data26Unit.teams[scope.team]?.PR||{};
+  if(t==='agent')return data26Unit.agents[scope.agent]?.PR||{};
+  if(t==='agent-dk')return data26Unit.agents[scope.agent]?.districts[scope.dk]?.PR||{};
+  if(t==='county')return data26Unit.counties[scope.county]?.PR||{};
+  if(t==='county-dist')return data26Unit.counties[scope.county]?.districts[scope.district]?.PR||{};
+  return{}
+}
+function get26Names(scope){return Object.keys(get26PR(scope))}
+
+// ══ Main calc ══
+async function doCalc(){
+  const btn=document.getElementById('calc-btn');btn.textContent='⏳ 處理中…';btn.disabled=true;
+  document.getElementById('error-area').innerHTML='';
+  Object.keys(det).forEach(k=>delete det[k]);detN=0;
+  try{
+    const rawWb=await readWb(rawFile);
+    rawRecords=parseRaw(rawWb);data26Unit=parseRaw26ForUnit(rawWb);
+    if(onlineFiles.length>0){onlineMap=new Map();for(const f of onlineFiles){const m=parseOnline(await readWb(f));for(const[k,v]of m)if(!onlineMap.has(k))onlineMap.set(k,v)}}
+    renderAll();document.getElementById('results').style.display='block';
+    document.getElementById('results').scrollIntoView({behavior:'smooth',block:'start'})
+  }catch(e){document.getElementById('error-area').innerHTML=`<div class="error-box">⚠️ ${e.message}</div>`;console.error(e)}
+  finally{btn.textContent='▶ 計算分析';btn.disabled=false}
+}
+function renderAll(){renderPen();renderUnit()}
+
+// ══ PENETRATION ══
+function renderPen(){
+  if(onlineMap.size===0){document.getElementById('sec-pen').innerHTML='<div class="error-box" style="margin:0">未上傳在線建案數，無法計算滲透率。</div>';return}
+  const totalOnline=onlineMap.size,allCoop=new Set(rawRecords.map(r=>r.project));
+  document.getElementById('s-coop').textContent=allCoop.size.toLocaleString();
+  document.getElementById('s-online').textContent=totalOnline.toLocaleString();
+  document.getElementById('s-rate').textContent=pct(allCoop.size,totalOnline);
+  const obd=buildOBD(),obc=buildOBC(obd),{coopByCounty}=buildCBC(),teamData=buildTD();
+  document.getElementById('view-pen-ag').innerHTML=penAgTable(teamData,allCoop,onlineMap,obd);
+  document.getElementById('view-pen-cn').innerHTML=penCnTable(obc,obd,coopByCounty,allCoop);
+  updatePenCount()
+}
+function buildOBD(){const o={};for(const[n,info]of onlineMap){const c=info.county||'(未知縣市)',d=info.district||'(未知區域)';if(!o[c])o[c]={};if(!o[c][d])o[c][d]=new Set();o[c][d].add(n)}return o}
+function buildOBC(obd){const o={};for(const[c,ds]of Object.entries(obd)){o[c]={total:0,districts:{}};for(const[d,ns]of Object.entries(ds)){o[c].districts[d]=ns.size;o[c].total+=ns.size}}return o}
+function buildTD(){const t={};for(const r of rawRecords){const tm=r.team||'(未分組)',ag=r.agent||'(未知業務)',cnt=r.county,dst=r.district;if(!t[tm])t[tm]={projects:new Set(),agents:{}};t[tm].projects.add(r.project);if(!t[tm].agents[ag])t[tm].agents[ag]={projects:new Set(),districts:{}};t[tm].agents[ag].projects.add(r.project);if(cnt||dst){const dk=(cnt||'')+'|'+(dst||'');if(!t[tm].agents[ag].districts[dk])t[tm].agents[ag].districts[dk]={projects:new Set(),county:cnt,district:dst};t[tm].agents[ag].districts[dk].projects.add(r.project)}}return t}
+function buildCBC(){const c={};for(const r of rawRecords){const co=r.county||'(未知縣市)',d=r.district||'(未知區域)';if(!c[co])c[co]={projects:new Set(),districts:{}};c[co].projects.add(r.project);if(!c[co].districts[d])c[co].districts[d]=new Set();c[co].districts[d].add(r.project)}return{coopByCounty:c}}
+function dOP(c,d,obd){return(c&&d&&obd[c]?.[d])||new Set()}
+function agOP(ag,obd){const s=new Set();for(const di of Object.values(ag.districts))for(const p of dOP(di.county,di.district,obd))s.add(p);return s}
+function tmOP(td,obd){const s=new Set(),seen=new Set();for(const ag of Object.values(td.agents))for(const[dk,di]of Object.entries(ag.districts))if(!seen.has(dk)){seen.add(dk);for(const p of dOP(di.county,di.district,obd))s.add(p)}return s}
+const TO=['業務一組','業務二組','業務三組','業務四組','業務五組'];
+function sortTeams(ks){return ks.sort((a,b)=>{const ia=TO.indexOf(a),ib=TO.indexOf(b);return(ia>=0&&ib>=0)?ia-ib:a.localeCompare(b,'zh-TW')})}
+
+function penAgTable(td,allCoop,onlineMapAll,obd){
+  let rows=penTR('全體合計',allCoop,new Set(onlineMapAll.keys()));
+  for(const tm of sortTeams(Object.keys(td))){
+    const t=td[tm],tid='ptm_'+sid(tm),tmop=tmOP(t,obd);rows+=penL0(tid,tm,t.projects,tmop);
+    for(const[ag,ad]of Object.entries(t.agents).sort((a,b)=>b[1].projects.size-a[1].projects.size)){
+      const aid='pag_'+tid+'_'+sid(ag),agop=agOP(ad,obd);rows+=penL1(aid,tid,ag,ad.projects,agop);
+      for(const[,di]of Object.entries(ad.districts).sort((a,b)=>b[1].projects.size-a[1].projects.size)){const do_=dOP(di.county,di.district,obd),lbl=[di.county,di.district].filter(Boolean).join(' · ');rows+=penL2(aid,lbl,di.projects,do_)}
+    }
+  }
+  return penTW('分組',rows)
+}
+function penCnTable(obc,obd,cbc,allCoop){
+  const tos=Object.values(obc).reduce((s,c)=>s+c.total,0);
+  let rows=penTR('全台合計',allCoop,new Set(onlineMap.keys()));
+  for(const county of Object.keys(obc).sort((a,b)=>obc[b].total-obc[a].total)){
+    const cid='pcn_'+sid(county),cop=new Set();for(const dn of Object.values(obd[county]||{}))dn.forEach(p=>cop.add(p));
+    rows+=penL0(cid,county,cbc[county]?.projects||new Set(),cop);
+    for(const[dist,don]of Object.entries(obc[county].districts).sort((a,b)=>b[1]-a[1])){const do_=obd[county]?.[dist]||new Set();rows+=penL1c(cid,dist,cbc[county]?.districts[dist]||new Set(),do_)}
+  }
+  return penTW('地區',rows)
+}
+function penTW(l,r){return`<table><thead><tr><th>${l}</th><th>合作建案數</th><th>在線建案數</th><th style="min-width:140px">滲透率</th></tr></thead><tbody>${r}</tbody></table>`}
+function penTR(l,cs,os){const ck=storeNames(cs),ok=storeNames(os);return`<tr class="r-total"><td>${l}</td><td>${nc(cs.size,ck,l+' 合作','coop')}</td><td>${nc(os.size,ok,l+' 在線','online')}</td><td>${badge(cs.size,os.size)}</td></tr>`}
+function penL0(id,l,cs,os){const ck=storeNames(cs),ok=storeNames(os);return`<tr class="r-lv0" id="row_${id}" onclick="toggle('${id}')"><td><span class="toggle">▶</span>${l}</td><td>${nc(cs.size,ck,l+' 合作','coop')}</td><td>${nc(os.size,ok,l+' 在線','online')}</td><td>${barBadge(cs.size,os.size)}</td></tr>`}
+function penL1(id,pid,l,cs,os){const ck=storeNames(cs),ok=storeNames(os);return`<tr class="r-lv1 expandable hidden" id="row_${id}" data-p="${pid}" onclick="toggle('${id}')"><td><span class="toggle">▶</span>${l}</td><td>${nc(cs.size,ck,l+' 合作','coop')}</td><td>${nc(os.size,ok,l+' 在線','online')}</td><td>${barBadge(cs.size,os.size)}</td></tr>`}
+function penL1c(pid,l,cs,os){const ck=storeNames(cs),ok=storeNames(os);return`<tr class="r-lv1 hidden" data-p="${pid}"><td>${l}</td><td>${nc(cs.size,ck,l+' 合作','coop')}</td><td>${nc(os.size,ok,l+' 在線','online')}</td><td>${barBadge(cs.size,os.size)}</td></tr>`}
+function penL2(pid,l,cs,os){const ck=storeNames(cs),ok=storeNames(os);return`<tr class="r-lv2 hidden" data-p="${pid}"><td>${l}</td><td>${nc(cs.size,ck,l+' 合作','coop')}</td><td>${nc(os.size,ok,l+' 在線','online')}</td><td>${os.size?barBadge(cs.size,os.size):'<span class="badge-none">-</span>'}</td></tr>`}
+
+// ══ UNIT PRICE ══
+function renderUnit(){
+  if(!data26Unit)return;
+  const p25=DATA_2025.total.n?Math.round(DATA_2025.total.rev/DATA_2025.total.n):0;
+  const p26=data26Unit.total.n?Math.round(data26Unit.total.rev/data26Unit.total.n):0;
+  document.getElementById('u-p25').textContent=fmt(p25);
+  document.getElementById('u-p26').textContent=fmt(p26);
+  document.getElementById('u-growth').textContent=growthFmt(p25,p26);
+  document.getElementById('view-unit-ag').innerHTML=unitAgTable();
+  document.getElementById('view-unit-cn').innerHTML=unitCnTable();
+  updateUnitCount()
+}
+
+function unitAgTable(){
+  const allAg=new Set([...Object.keys(DATA_2025.agents),...Object.keys(data26Unit.agents)]);
+  const ta={};for(const ag of allAg){const tm=data26Unit.agents[ag]?.team||DATA_2025.agents[ag]?.team||'(未分組)';if(!ta[tm])ta[tm]=new Set();ta[tm].add(ag)}
+  let rows=uTotalRow();
+  for(const tm of sortTeams(Object.keys(ta))){
+    const d25=DATA_2025.teams[tm]||{n:0,rev:0},d26=data26Unit.teams[tm]||{n:0,rev:0,PR:{}};
+    const tid='utm_'+sid(tm);rows+=uL0(tid,tm,d25,d26,{type:'team',team:tm});
+    for(const ag of [...ta[tm]].sort((a,b)=>(data26Unit.agents[b]?.n||0)-(data26Unit.agents[a]?.n||0))){
+      const a25=DATA_2025.agents[ag]||{n:0,rev:0},a26=data26Unit.agents[ag]||{n:0,rev:0,PR:{},districts:{}};
+      const aid='uag_'+tid+'_'+sid(ag);rows+=uL1(aid,tid,ag,a25,a26,{type:'agent',agent:ag});
+      const allDks=new Set([...Object.keys(DATA_2025_PROJ[ag]||{}),...Object.keys(a26.districts)]);
+      for(const dk of [...allDks].sort((x,y)=>(a26.districts[y]?.n||0)-(a26.districts[x]?.n||0))){
+        const dd25_n=Object.keys(DATA_2025_PROJ[ag]?.[dk]||{}).length,dd25_r=Object.values(DATA_2025_PROJ[ag]?.[dk]||{}).reduce((s,v)=>s+v,0);
+        const dd26=a26.districts[dk]||{n:0,rev:0,PR:{}};
+        const info=a26.districts[dk]||Object.entries(DATA_2025_PROJ[ag]?.[dk]||{})[0]?{county:dk.split('|')[0],district:dk.split('|')[1]}:{county:dk.split('|')[0],district:dk.split('|')[1]};
+        const lbl=[info.county||dk.split('|')[0],info.district||dk.split('|')[1]].filter(Boolean).join(' · ');
+        rows+=uL2(aid,lbl,{n:dd25_n,rev:dd25_r},{n:dd26.n,rev:dd26.rev},{type:'agent-dk',agent:ag,dk})
+      }
+    }
+  }
+  return uTW(rows)
+}
+
+function unitCnTable(){
+  const allC=new Set([...Object.keys(DATA_2025.counties),...Object.keys(data26Unit.counties)]);
+  let rows=uTotalRow();
+  for(const county of [...allC].sort((a,b)=>(data26Unit.counties[b]?.n||0)-(data26Unit.counties[a]?.n||0))){
+    const c25=DATA_2025.counties[county]||{n:0,rev:0,districts:{}},c26=data26Unit.counties[county]||{n:0,rev:0,PR:{},districts:{}};
+    const cid='ucn_'+sid(county);rows+=uL0(cid,county,c25,c26,{type:'county',county});
+    const allD=new Set([...Object.keys(c25.districts),...Object.keys(c26.districts)]);
+    for(const dist of [...allD].sort((x,y)=>(c26.districts[y]?.n||0)-(c26.districts[x]?.n||0))){
+      const dd25=c25.districts[dist]||{n:0,rev:0},dd26=c26.districts[dist]||{n:0,rev:0,PR:{}};
+      rows+=uL1c(cid,dist,dd25,dd26,{type:'county-dist',county,district:dist})
+    }
+  }
+  return uTW(rows)
+}
+
+function uTW(r){return`<table><thead><tr><th>分組／地區</th><th>25合作數</th><th>25年業績</th><th>25客單價</th><th>26合作數</th><th>26年業績</th><th>26客單價</th><th style="min-width:75px">成長率</th></tr></thead><tbody>${r}</tbody></table>`}
+
+function uTotalRow(){
+  const d25=DATA_2025.total,d26=data26Unit.total;
+  const p25=d25.n?Math.round(d25.rev/d25.n):0,p26=d26.n?Math.round(d26.rev/d26.n):0;
+  const k25n=storeNames(get25Names({type:'total'})),k25r=storeRevs(get25PR({type:'total'}));
+  const k26n=storeNames(get26Names({type:'total'})),k26r=storeRevs(get26PR({type:'total'}));
+  return`<tr class="r-total"><td>全體合計</td><td>${nc(d25.n,k25n,'2025 合作','coop')}</td><td>${rc(d25.rev,k25r,'2025 業績明細')}</td><td>${d25.n?fmt(p25):'-'}</td><td>${nc(d26.n,k26n,'2026 合作','coop')}</td><td>${rc(d26.rev,k26r,'2026 業績明細')}</td><td>${d26.n?fmt(p26):'-'}</td><td>${growthBadge(p25,p26,d25.n,d26.n)}</td></tr>`
+}
+function uL0(id,lbl,d25,d26,scope){
+  const p25=d25.n?Math.round(d25.rev/d25.n):0,p26=d26.n?Math.round(d26.rev/d26.n):0;
+  const k25n=storeNames(get25Names(scope)),k25r=storeRevs(get25PR(scope));
+  const k26n=storeNames(get26Names(scope)),k26r=storeRevs(get26PR(scope));
+  return`<tr class="r-lv0" id="row_${id}" onclick="toggle('${id}')"><td><span class="toggle">▶</span>${lbl}</td><td>${nc(d25.n,k25n,lbl+' 2025合作','coop')}</td><td>${rc(d25.rev,k25r,lbl+' 2025業績')}</td><td>${d25.n?fmt(p25):'<span class="g-na">-</span>'}</td><td>${nc(d26.n,k26n,lbl+' 2026合作','coop')}</td><td>${rc(d26.rev,k26r,lbl+' 2026業績')}</td><td>${d26.n?fmt(p26):'<span class="g-na">-</span>'}</td><td>${growthBadge(p25,p26,d25.n,d26.n)}</td></tr>`
+}
+function uL1(id,pid,lbl,d25,d26,scope){
+  const p25=d25.n?Math.round(d25.rev/d25.n):0,p26=d26.n?Math.round(d26.rev/d26.n):0;
+  const k25n=storeNames(get25Names(scope)),k25r=storeRevs(get25PR(scope));
+  const k26n=storeNames(get26Names(scope)),k26r=storeRevs(get26PR(scope));
+  return`<tr class="r-lv1 expandable hidden" id="row_${id}" data-p="${pid}" onclick="toggle('${id}')"><td><span class="toggle">▶</span>${lbl}</td><td>${nc(d25.n,k25n,lbl+' 2025合作','coop')}</td><td>${rc(d25.rev,k25r,lbl+' 2025業績')}</td><td>${d25.n?fmt(p25):'<span class="g-na">-</span>'}</td><td>${nc(d26.n,k26n,lbl+' 2026合作','coop')}</td><td>${rc(d26.rev,k26r,lbl+' 2026業績')}</td><td>${d26.n?fmt(p26):'<span class="g-na">-</span>'}</td><td>${growthBadge(p25,p26,d25.n,d26.n)}</td></tr>`
+}
+function uL1c(pid,lbl,d25,d26,scope){
+  const p25=d25.n?Math.round(d25.rev/d25.n):0,p26=d26.n?Math.round(d26.rev/d26.n):0;
+  const k25n=storeNames(get25Names(scope)),k25r=storeRevs(get25PR(scope));
+  const k26n=storeNames(get26Names(scope)),k26r=storeRevs(get26PR(scope));
+  return`<tr class="r-lv1 hidden" data-p="${pid}"><td>${lbl}</td><td>${nc(d25.n,k25n,lbl+' 2025合作','coop')}</td><td>${rc(d25.rev,k25r,lbl+' 2025業績')}</td><td>${d25.n?fmt(p25):'<span class="g-na">-</span>'}</td><td>${nc(d26.n,k26n,lbl+' 2026合作','coop')}</td><td>${rc(d26.rev,k26r,lbl+' 2026業績')}</td><td>${d26.n?fmt(p26):'<span class="g-na">-</span>'}</td><td>${growthBadge(p25,p26,d25.n,d26.n)}</td></tr>`
+}
+function uL2(pid,lbl,d25,d26,scope){
+  const p25=d25.n?Math.round(d25.rev/d25.n):0,p26=d26.n?Math.round(d26.rev/d26.n):0;
+  const k25n=storeNames(get25Names(scope)),k25r=storeRevs(get25PR(scope));
+  const k26n=storeNames(get26Names(scope)),k26r=storeRevs(get26PR(scope));
+  return`<tr class="r-lv2 hidden" data-p="${pid}"><td>${lbl}</td><td>${nc(d25.n,k25n,lbl+' 2025合作','coop')}</td><td>${rc(d25.rev,k25r,lbl+' 2025業績')}</td><td>${d25.n?fmt(p25):'<span class="g-na">-</span>'}</td><td>${nc(d26.n,k26n,lbl+' 2026合作','coop')}</td><td>${rc(d26.rev,k26r,lbl+' 2026業績')}</td><td>${d26.n?fmt(p26):'<span class="g-na">-</span>'}</td><td>${growthBadge(p25,p26,d25.n,d26.n)}</td></tr>`
+}
+
+// ══ Toggle / Expand / Collapse ══
+function toggle(id){
+  const row=document.getElementById('row_'+id);if(!row)return;
+  const ch=document.querySelectorAll(`[data-p="${id}"]`);const isOpen=row.classList.contains('open');
+  row.classList.toggle('open',!isOpen);
+  ch.forEach(c=>{c.classList.toggle('hidden',isOpen);if(isOpen&&c.id){const cid=c.id.replace('row_','');document.querySelectorAll(`[data-p="${cid}"]`).forEach(g=>g.classList.add('hidden'));c.classList.remove('open')}})
+}
+function penExpandAll(){document.querySelectorAll('#sec-pen .r-lv0,#sec-pen .r-lv1.expandable').forEach(r=>{const id=r.id?.replace('row_','');if(!id)return;r.classList.add('open');document.querySelectorAll(`[data-p="${id}"]`).forEach(c=>c.classList.remove('hidden'))})}
+function penCollapseAll(){document.querySelectorAll('#sec-pen .r-lv0,#sec-pen .r-lv1.expandable').forEach(r=>r.classList.remove('open'));document.querySelectorAll('#sec-pen .r-lv1,#sec-pen .r-lv2').forEach(c=>c.classList.add('hidden'))}
+function unitExpandAll(){document.querySelectorAll('#sec-unit .r-lv0,#sec-unit .r-lv1.expandable').forEach(r=>{const id=r.id?.replace('row_','');if(!id)return;r.classList.add('open');document.querySelectorAll(`[data-p="${id}"]`).forEach(c=>c.classList.remove('hidden'))})}
+function unitCollapseAll(){document.querySelectorAll('#sec-unit .r-lv0,#sec-unit .r-lv1.expandable').forEach(r=>r.classList.remove('open'));document.querySelectorAll('#sec-unit .r-lv1,#sec-unit .r-lv2').forEach(c=>c.classList.add('hidden'))}
+
+// ══ Feature / Dim switch ══
+function switchFeature(f){currentFeat=f;document.getElementById('sec-pen').style.display=f==='pen'?'':'none';document.getElementById('sec-unit').style.display=f==='unit'?'':'none';document.getElementById('fb-pen').classList.toggle('active',f==='pen');document.getElementById('fb-unit').classList.toggle('active',f==='unit')}
+function switchPenDim(d){penDim=d;document.getElementById('view-pen-ag').style.display=d==='ag'?'':'none';document.getElementById('view-pen-cn').style.display=d==='cn'?'':'none';document.getElementById('tab-pen-ag').classList.toggle('active',d==='ag');document.getElementById('tab-pen-cn').classList.toggle('active',d==='cn');document.getElementById('pen-search').value='';updatePenCount()}
+function switchUnitDim(d){unitDim=d;document.getElementById('view-unit-ag').style.display=d==='ag'?'':'none';document.getElementById('view-unit-cn').style.display=d==='cn'?'':'none';document.getElementById('tab-unit-ag').classList.toggle('active',d==='ag');document.getElementById('tab-unit-cn').classList.toggle('active',d==='cn');document.getElementById('unit-search').value='';updateUnitCount()}
+function updatePenCount(){const v=penDim==='ag'?'view-pen-ag':'view-pen-cn';document.getElementById('pen-count').textContent=`共 ${document.querySelectorAll('#'+v+' .r-lv0').length} 個群組`}
+function updateUnitCount(){const v=unitDim==='ag'?'view-unit-ag':'view-unit-cn';document.getElementById('unit-count').textContent=`共 ${document.querySelectorAll('#'+v+' .r-lv0').length} 個群組`}
+
+// ══ Search ══
+function searchIn(scope,q){
+  q=q.trim().toLowerCase();const sec=scope==='pen'?'#sec-pen':'#sec-unit';
+  if(!q){if(scope==='pen')penCollapseAll();else unitCollapseAll();return}
+  document.querySelectorAll(`${sec} .r-lv0`).forEach(r=>r.style.display='');
+  document.querySelectorAll(`${sec} .r-lv1,${sec} .r-lv2`).forEach(r=>r.style.display='none');
+  document.querySelectorAll(`${sec} .r-lv0,${sec} .r-lv1,${sec} .r-lv2`).forEach(row=>{
+    const text=row.querySelector('td').textContent.toLowerCase();
+    if(text.includes(q)){row.style.display='';let pid=row.dataset?.p;while(pid){const par=document.getElementById('row_'+pid);if(par){par.style.display='';par.classList.add('open')}document.querySelectorAll(`[data-p="${pid}"]`).forEach(s=>s.style.display='');pid=par?.dataset?.p}}
+  })
+}
+function onPenSearch(v){searchIn('pen',v)}
+function onUnitSearch(v){searchIn('unit',v)}
+
+// ══ Modal ══
+function showDetail(key,title,type){
+  const s=det[key];if(!s)return;
+  _modalData=s;
+  document.getElementById('modal-title').textContent=title;
+  document.getElementById('modal-search').value='';
+  if(s.type==='names'){document.getElementById('modal-sub').textContent=`${type==='coop'?'🤝 合作建案':'🏢 在線建案'} — 共 ${s.items.length} 個`;renderNameList(s.items,'')}
+  else if(s.type==='revs'){document.getElementById('modal-sub').textContent=`💰 業績明細 — 共 ${s.items.length} 個建案`;renderRevList(s.items,'')}
+  document.getElementById('modal-overlay').classList.add('open')
+}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open')}
+function filterModal(q){if(_modalData?.type==='names')renderNameList(_modalData.items,q);else if(_modalData?.type==='revs')renderRevList(_modalData.items,q)}
+function renderNameList(items,q){
+  const f=q?items.filter(n=>n.toLowerCase().includes(q.toLowerCase())):items;
+  const list=document.getElementById('modal-list');
+  if(!f.length){list.innerHTML='<div class="mod-empty">無符合結果</div>';return}
+  list.innerHTML=f.map((n,i)=>`<div class="mod-item"><span class="mod-idx">${i+1}</span><span class="mod-name">${n}</span></div>`).join('');
+  document.getElementById('modal-footer').textContent=q?`顯示 ${f.length} / ${items.length} 個`:`共 ${items.length} 個建案`
+}
+function renderRevList(items,q){
+  const f=q?items.filter(({p})=>p.toLowerCase().includes(q.toLowerCase())):items;
+  const list=document.getElementById('modal-list');
+  if(!f.length){list.innerHTML='<div class="mod-empty">無符合結果</div>';document.getElementById('modal-footer').textContent='無符合結果';return}
+  const total=f.reduce((s,{r})=>s+r,0);
+  list.innerHTML=f.map(({p,r},i)=>`<div class="mod-item"><span class="mod-idx">${i+1}</span><span class="mod-name">${p}</span><span class="mod-rev-val">${r.toLocaleString()}</span></div>`).join('');
+  document.getElementById('modal-footer').innerHTML=`<div class="mod-total-row"><span>共 ${f.length} 個建案</span><span>合計：<strong>${total.toLocaleString()}</strong></span></div>`
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+
+// ══ Growth ══
+function growthFmt(p25,p26){if(!p25||!p26)return'-';const g=(p26/p25-1)*100;return(g>=0?'+':'')+g.toFixed(1)+'%'}
+function growthBadge(p25,p26,n25,n26){if(!n25||!n26||!p25||!p26)return'<span class="g-na">-</span>';const g=(p26/p25-1)*100;return`<span class="${g>=0?'g-pos':'g-neg'}">${g>=0?'+':''}${g.toFixed(1)}%</span>`}
+
+// ══ Cell helpers ══
+function nc(n,key,title,type){if(!n)return`<span class="num-zero">0</span>`;return`<span class="num-link" onclick="event.stopPropagation();showDetail('${key}','${esc(title)}','${type}')">${n.toLocaleString()}</span>`}
+function rc(rev,key,title){if(!rev&&rev!==0)return`<span class="g-na">-</span>`;if(rev===0)return`<span class="num-zero">0</span>`;return`<span class="rev-link" onclick="event.stopPropagation();showDetail('${key}','${esc(title)}','rev')">${rev.toLocaleString()}</span>`}
+
+// ══ Common helpers ══
+function sid(s){return s.replace(/[\s(（）·)]/g,'_')}
+function fmt(n){return n!=null?Number(n).toLocaleString():'-'}
+function esc(s){return String(s).replace(/'/g,"&#39;").replace(/"/g,"&quot;")}
+function pct(n,d){return d?(n/d*100).toFixed(1)+'%':'-'}
+function rateClass(n,d){if(!d)return'none';const r=n/d;return r>=.15?'high':r>=.05?'mid':'low'}
+function badge(n,d){if(!d)return'<span class="badge-none">-</span>';return`<span class="badge badge-${rateClass(n,d)}">${pct(n,d)}</span>`}
+function barBadge(n,d){if(!d)return'<span class="badge-none">-</span>';const c=rateClass(n,d),w=Math.min(100,n/d*100).toFixed(1);return`<div class="bar-wrap"><div class="bar-bg"><div class="bar-fill bar-${c}" style="width:${w}%"></div></div><span class="badge badge-${c}">${pct(n,d)}</span></div>`}
+</script>
+</body>
+</html>
