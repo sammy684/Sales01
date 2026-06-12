@@ -913,7 +913,7 @@ function unitAgTable(){
   const allAg=new Set([...Object.keys(cur25.agents),...Object.keys(cur26.agents)]);
   const ta={};for(const ag of allAg){const tm=cur26.agents[ag]?.team||cur25.agents[ag]?.team||'(\u672a\u5206\u7d44)';if(!ta[tm])ta[tm]=new Set();ta[tm].add(ag)}
   let rows=uTotalRow();
-  for(const tm of sortTeams(Object.keys(ta))){
+  for(const tm of sortTeams(ta)){
     const d25=cur25.teams[tm]||{n:0,rev:0},d26=cur26.teams[tm]||{n:0,rev:0,PR:{}};
     const tid='utm_'+sid(tm);rows+=uL0(tid,tm,d25,d26,{type:'team',team:tm});
     for(const ag of [...ta[tm]].sort((a,b)=>(cur26.agents[b]?.n||0)-(cur26.agents[a]?.n||0))){
