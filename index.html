@@ -205,7 +205,8 @@
 
 function handleGoogleAuth(response){
   try{
-    const payload=JSON.parse(atob(response.credential.split('.')[1]));
+    const b64=response.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    const payload=JSON.parse(atob(b64));
     if(payload.email&&payload.email.endsWith('@digitm.com.tw')){
       sessionStorage.setItem('digitm_auth_v1',JSON.stringify({email:payload.email,name:payload.name,exp:payload.exp}));
       document.getElementById('auth-overlay').style.display='none';
