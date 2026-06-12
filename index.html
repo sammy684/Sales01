@@ -872,4 +872,202 @@ function penL2(pid,l,cs,os,vs){
 
 // \u2500\u2500 2025 detail helpers \u2500\u2500
 // ── UNIT PRICE ──
-function get25PR(sc){if(!cur25)return{};const t=sc.type;if(t==='total')return cur25.total.PR||{};if(t==='team')return cur25.teams[sc.team]?.PR||{};if(t==='agent')return cur25.agents[sc.agent]?.PR||{};if(t==='agent-dk')return cur25.agents[sc.agent]?.districts[sc.dk]?.PR||{};if(t==='county')return cur25.counties[sc.county]?.PR||{};if(t==='county-dist')return cur25.counties[sc.county]?.districts[sc.district]?.PR||{}
+function get25PR(sc){if(!cur25)return{};const t=sc.type;if(t==='total')return cur25.total.PR||{};if(t==='team')return cur25.teams[sc.team]?.PR||{};if(t==='agent')return cur25.agents[sc.agent]?.PR||{};if(t==='agent-dk')return cur25.agents[sc.agent]?.districts[sc.dk]?.PR||{};if(t==='county')return cur25.counties[sc.county]?.PR||{};if(t==='county-dist')return cur25.counties[sc.county]?.districts[sc.district]?.PR||{};return{}}
+function get25Names(sc){return Object.keys(get25PR(sc))}
+function get26PR(sc){if(!cur26)return{};const t=sc.type;if(t==='total')return cur26.total.PR||{};if(t==='team')return cur26.teams[sc.team]?.PR||{};if(t==='agent')return cur26.agents[sc.agent]?.PR||{};if(t==='agent-dk')return cur26.agents[sc.agent]?.districts[sc.dk]?.PR||{};if(t==='county')return cur26.counties[sc.county]?.PR||{};if(t==='county-dist')return cur26.counties[sc.county]?.districts[sc.district]?.PR||{};return{}}
+function get26Names(sc){return Object.keys(get26PR(sc))}
+function renderUnit(){
+  if(!raw26Monthly)return;
+  const months=periodMonths(unitPeriod);
+  cur25=buildAgg(DATA_2025_MONTHLY,months);
+  cur26=buildAgg(raw26Monthly,months);
+  const p25=cur25.total.n?Math.round(cur25.total.rev/cur25.total.n):0;
+  const p26=cur26.total.n?Math.round(cur26.total.rev/cur26.total.n):0;
+  document.getElementById('u-p25').textContent=fmt(p25);
+  document.getElementById('u-p26').textContent=fmt(p26);
+  document.getElementById('u-growth').textContent=growthFmt(p25,p26);
+  document.getElementById('view-unit-ag').innerHTML=unitAgTable();
+  document.getElementById('view-unit-cn').innerHTML=unitCnTable();
+  updateUnitCount()
+}
+function unitAgTable(){
+  const allAg=new Set([...Object.keys(cur25.agents),...Object.keys(cur26.agents)]);
+  const ta={};for(const ag of allAg){const tm=cur26.agents[ag]?.team||cur25.agents[ag]?.team||'(\u672a\u5206\u7d44)';if(!ta[tm])ta[tm]=new Set();ta[tm].add(ag)}
+  let rows=uTotalRow();
+  for(const tm of Object.keys(ta).sort((a,b)=>teamRank(a)-teamRank(b))){
+    const d25=cur25.teams[tm]||{n:0,rev:0},d26=cur26.teams[tm]||{n:0,rev:0,PR:{}};
+    const tid='utm_'+sid(tm);rows+=uL0(tid,tm,d25,d26,{type:'team',team:tm});
+    for(const ag of [...ta[tm]].sort((a,b)=>(cur26.agents[b]?.n||0)-(cur26.agents[a]?.n||0))){
+      const a25=cur25.agents[ag]||{n:0,rev:0},a26=cur26.agents[ag]||{n:0,rev:0,PR:{},districts:{}};
+      const aid='uag_'+tid+'_'+sid(ag);rows+=uL1(aid,tid,ag,a25,a26,{type:'agent',agent:ag});
+      const allDks=new Set([...Object.keys(cur25.agents[ag]?.districts||{}),...Object.keys(a26.districts)]);
+      for(const dk of [...allDks].sort((x,y)=>(a26.districts[y]?.n||0)-(a26.districts[x]?.n||0))){
+        const dd25=cur25.agents[ag]?.districts[dk]||{n:0,rev:0},dd25_n=dd25.n,dd25_r=dd25.rev;
+        const dd26=a26.districts[dk]||{n:0,rev:0,PR:{}};
+        const parts=dk.split('|');const lbl=[parts[0],parts[1]].filter(Boolean).join(' \u00b7 ');
+        rows+=uL2(aid,lbl,{n:dd25_n,rev:dd25_r},{n:dd26.n,rev:dd26.rev},{type:'agent-dk',agent:ag,dk})
+      }
+    }
+  }
+  return uTW(rows)
+}
+function unitCnTable(){
+  if(!cur25||!cur26)return'';
+  const allC=new Set([...Object.keys(cur25.counties),...Object.keys(cur26.counties)]);
+  let rows=uTotalRow();
+  for(const county of sortCounties([...allC])){
+    const c25=cur25.counties[county]||{n:0,rev:0,districts:{}},c26=cur26.counties[county]||{n:0,rev:0,PR:{},districts:{}};
+    const cid='ucn_'+sid(county);rows+=uL0(cid,county,c25,c26,{type:'county',county});
+    const allD=new Set([...Object.keys(c25.districts),...Object.keys(c26.districts)]);
+    for(const dist of [...allD].sort((x,y)=>(c26.districts[y]?.n||0)-(c26.districts[x]?.n||0))){
+      const dd25=c25.districts[dist]||{n:0,rev:0},dd26=c26.districts[dist]||{n:0,rev:0,PR:{}};
+      rows+=uL1c(cid,dist,dd25,dd26,{type:'county-dist',county,district:dist})
+    }
+  }
+  return uTW(rows)
+}
+function uTW(r){return`<table><thead><tr><th>\u5206\u7d44\uff0f\u5730\u5340</th><th>25\u5408\u4f5c\u6578</th><th>25\u5e74\u696d\u7e3e</th><th>25\u5ba2\u55ae\u50f9</th><th>26\u5408\u4f5c\u6578</th><th>26\u5e74\u696d\u7e3e</th><th>26\u5ba2\u55ae\u50f9</th><th style="min-width:75px">\u6210\u9577\u7387</th></tr></thead><tbody>${r}</tbody></table>`}
+function uTotalRow(){
+  const d25=cur25.total,d26=cur26.total;const p25=d25.n?Math.round(d25.rev/d25.n):0,p26=d26.n?Math.round(d26.rev/d26.n):0;
+  const k25n=storeNames(get25Names({type:'total'})),k25r=storeRevs(get25PR({type:'total'}));
+  const k26n=storeNames(get26Names({type:'total'})),k26r=storeRevs(get26PR({type:'total'}));
+  return`<tr class="r-total"><td>\u5168\u9ad4\u5408\u8a08</td><td>${nc(d25.n,k25n,'2025 \u5408\u4f5c','coop')}</td><td>${rc(d25.rev,k25r,'2025 \u696d\u7e3e\u660e\u7d30')}</td><td>${d25.n?fmt(p25):'-'}</td><td>${nc(d26.n,k26n,'2026 \u5408\u4f5c','coop')}</td><td>${rc(d26.rev,k26r,'2026 \u696d\u7e3e\u660e\u7d30')}</td><td>${d26.n?fmt(p26):'-'}</td><td>${growthBadge(p25,p26,d25.n,d26.n)}</td></tr>`
+}
+function uL0(id,l,d25,d26,sc){const p25=d25.n?Math.round(d25.rev/d25.n):0,p26=d26.n?Math.round(d26.rev/d26.n):0;const k25n=storeNames(get25Names(sc)),k25r=storeRevs(get25PR(sc)),k26n=storeNames(get26Names(sc)),k26r=storeRevs(get26PR(sc));return`<tr class="r-lv0" id="row_${id}" onclick="toggle('${id}')"><td><span class="toggle">\u25b6</span>${l}</td><td>${nc(d25.n,k25n,l+' 2025','coop')}</td><td>${rc(d25.rev,k25r,l+' 2025\u696d\u7e3e')}</td><td>${d25.n?fmt(p25):'<span class="g-na">-</span>'}</td><td>${nc(d26.n,k26n,l+' 2026','coop')}</td><td>${rc(d26.rev,k26r,l+' 2026\u696d\u7e3e')}</td><td>${d26.n?fmt(p26):'<span class="g-na">-</span>'}</td><td>${growthBadge(p25,p26,d25.n,d26.n)}</td></tr>`}
+function uL1(id,pid,l,d25,d26,sc){const p25=d25.n?Math.round(d25.rev/d25.n):0,p26=d26.n?Math.round(d26.rev/d26.n):0;const k25n=storeNames(get25Names(sc)),k25r=storeRevs(get25PR(sc)),k26n=storeNames(get26Names(sc)),k26r=storeRevs(get26PR(sc));return`<tr class="r-lv1 expandable hidden" id="row_${id}" data-p="${pid}" onclick="toggle('${id}')"><td><span class="toggle">\u25b6</span>${l}</td><td>${nc(d25.n,k25n,l+' 2025','coop')}</td><td>${rc(d25.rev,k25r,l+' 2025\u696d\u7e3e')}</td><td>${d25.n?fmt(p25):'<span class="g-na">-</span>'}</td><td>${nc(d26.n,k26n,l+' 2026','coop')}</td><td>${rc(d26.rev,k26r,l+' 2026\u696d\u7e3e')}</td><td>${d26.n?fmt(p26):'<span class="g-na">-</span>'}</td><td>${growthBadge(p25,p26,d25.n,d26.n)}</td></tr>`}
+function uL1c(pid,l,d25,d26,sc){const p25=d25.n?Math.round(d25.rev/d25.n):0,p26=d26.n?Math.round(d26.rev/d26.n):0;const k25n=storeNames(get25Names(sc)),k25r=storeRevs(get25PR(sc)),k26n=storeNames(get26Names(sc)),k26r=storeRevs(get26PR(sc));return`<tr class="r-lv1 hidden" data-p="${pid}"><td>${l}</td><td>${nc(d25.n,k25n,l+' 2025','coop')}</td><td>${rc(d25.rev,k25r,l+' 2025\u696d\u7e3e')}</td><td>${d25.n?fmt(p25):'<span class="g-na">-</span>'}</td><td>${nc(d26.n,k26n,l+' 2026','coop')}</td><td>${rc(d26.rev,k26r,l+' 2026\u696d\u7e3e')}</td><td>${d26.n?fmt(p26):'<span class="g-na">-</span>'}</td><td>${growthBadge(p25,p26,d25.n,d26.n)}</td></tr>`}
+function uL2(pid,l,d25,d26,sc){const p25=d25.n?Math.round(d25.rev/d25.n):0,p26=d26.n?Math.round(d26.rev/d26.n):0;const k25n=storeNames(get25Names(sc)),k25r=storeRevs(get25PR(sc)),k26n=storeNames(get26Names(sc)),k26r=storeRevs(get26PR(sc));return`<tr class="r-lv2 hidden" data-p="${pid}"><td>${l}</td><td>${nc(d25.n,k25n,l+' 2025','coop')}</td><td>${rc(d25.rev,k25r,l+' 2025\u696d\u7e3e')}</td><td>${d25.n?fmt(p25):'<span class="g-na">-</span>'}</td><td>${nc(d26.n,k26n,l+' 2026','coop')}</td><td>${rc(d26.rev,k26r,l+' 2026\u696d\u7e3e')}</td><td>${d26.n?fmt(p26):'<span class="g-na">-</span>'}</td><td>${growthBadge(p25,p26,d25.n,d26.n)}</td></tr>`}
+
+// \u2500\u2500 Toggle / Expand \u2500\u2500
+// ── UI controls ──
+function toggle(id){const row=document.getElementById('row_'+id);if(!row)return;const ch=document.querySelectorAll(`[data-p="${id}"]`);const isOpen=row.classList.contains('open');row.classList.toggle('open',!isOpen);ch.forEach(c=>{c.classList.toggle('hidden',isOpen);if(isOpen&&c.id){const cid=c.id.replace('row_','');document.querySelectorAll(`[data-p="${cid}"]`).forEach(g=>g.classList.add('hidden'));c.classList.remove('open')}})}
+function penExpandAll(){document.querySelectorAll('#sec-pen .r-lv0,#sec-pen .r-lv1.expandable').forEach(r=>{const id=r.id?.replace('row_','');if(!id)return;r.classList.add('open');document.querySelectorAll(`[data-p="${id}"]`).forEach(c=>c.classList.remove('hidden'))})}
+function penCollapseAll(){document.querySelectorAll('#sec-pen .r-lv0,#sec-pen .r-lv1.expandable').forEach(r=>r.classList.remove('open'));document.querySelectorAll('#sec-pen .r-lv1,#sec-pen .r-lv2').forEach(c=>c.classList.add('hidden'))}
+function unitExpandAll(){document.querySelectorAll('#sec-unit .r-lv0,#sec-unit .r-lv1.expandable').forEach(r=>{const id=r.id?.replace('row_','');if(!id)return;r.classList.add('open');document.querySelectorAll(`[data-p="${id}"]`).forEach(c=>c.classList.remove('hidden'))})}
+function unitCollapseAll(){document.querySelectorAll('#sec-unit .r-lv0,#sec-unit .r-lv1.expandable').forEach(r=>r.classList.remove('open'));document.querySelectorAll('#sec-unit .r-lv1,#sec-unit .r-lv2').forEach(c=>c.classList.add('hidden'))}
+
+// \u2500\u2500 Feature / Dim switch \u2500\u2500
+function switchFeature(f){currentFeat=f;document.getElementById('sec-pen').style.display=f==='pen'?'':'none';document.getElementById('sec-unit').style.display=f==='unit'?'':'none';document.getElementById('sec-val').style.display=f==='val'?'':'none';document.getElementById('fb-pen').classList.toggle('active',f==='pen');document.getElementById('fb-unit').classList.toggle('active',f==='unit');document.getElementById('fb-val').classList.toggle('active',f==='val')}
+function switchPenDim(d){penDim=d;document.getElementById('view-pen-ag').style.display=d==='ag'?'':'none';document.getElementById('view-pen-cn').style.display=d==='cn'?'':'none';document.getElementById('tab-pen-ag').classList.toggle('active',d==='ag');document.getElementById('tab-pen-cn').classList.toggle('active',d==='cn');document.getElementById('pen-search').value='';updatePenCount()}
+function switchUnitDim(d){unitDim=d;document.getElementById('view-unit-ag').style.display=d==='ag'?'':'none';document.getElementById('view-unit-cn').style.display=d==='cn'?'':'none';document.getElementById('tab-unit-ag').classList.toggle('active',d==='ag');document.getElementById('tab-unit-cn').classList.toggle('active',d==='cn');document.getElementById('unit-search').value='';updateUnitCount()}
+function updatePenCount(){const v=penDim==='ag'?'view-pen-ag':'view-pen-cn';document.getElementById('pen-count').textContent=`\u5171 ${document.querySelectorAll('#'+v+' .r-lv0').length} \u500b\u7fa4\u7d44`}
+function updateUnitCount(){const v=unitDim==='ag'?'view-unit-ag':'view-unit-cn';document.getElementById('unit-count').textContent=`\u5171 ${document.querySelectorAll('#'+v+' .r-lv0').length} \u500b\u7fa4\u7d44`}
+
+// \u2500\u2500 Search \u2500\u2500
+function searchIn(scope,q){
+  q=q.trim().toLowerCase();const sec=scope==='pen'?'#sec-pen':'#sec-unit';
+  if(!q){if(scope==='pen')penCollapseAll();else unitCollapseAll();return}
+  document.querySelectorAll(`${sec} .r-lv0`).forEach(r=>r.style.display='');
+  document.querySelectorAll(`${sec} .r-lv1,${sec} .r-lv2`).forEach(r=>r.style.display='none');
+  document.querySelectorAll(`${sec} .r-lv0,${sec} .r-lv1,${sec} .r-lv2`).forEach(row=>{
+    const text=row.querySelector('td').textContent.toLowerCase();
+    if(text.includes(q)){row.style.display='';let pid=row.dataset?.p;while(pid){const par=document.getElementById('row_'+pid);if(par){par.style.display='';par.classList.add('open')}document.querySelectorAll(`[data-p="${pid}"]`).forEach(s=>s.style.display='');pid=par?.dataset?.p}}
+  })
+}
+function onPenSearch(v){searchIn('pen',v)}
+function onUnitSearch(v){searchIn('unit',v)}
+
+// \u2500\u2500 Modal \u2500\u2500
+// ── Modal ──
+function showDetail(key,title,type){
+  const s=det[key];if(!s)return;_modalData=s;
+  document.getElementById('modal-title').textContent=title;document.getElementById('modal-search').value='';
+  if(s.type==='names'){document.getElementById('modal-sub').textContent=`${type==='coop'?'\ud83e\udd1d \u5408\u4f5c\u5efa\u6848':type==='val'?'\ud83d\udd37 \u6709\u50f9\u503c\u5efa\u6848':'\ud83c\udfe2 \u5728\u7dda\u5efa\u6848'} \u2014 \u5171 ${s.items.length} \u500b`;renderNameList(s.items,'')}
+  else if(s.type==='revs'){document.getElementById('modal-sub').textContent=`\ud83d\udcb0 \u696d\u7e3e\u660e\u7d30 \u2014 \u5171 ${s.items.length} \u500b\u5efa\u6848`;renderRevList(s.items,'')}
+  document.getElementById('modal-overlay').classList.add('open')
+}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open')}
+function filterModal(q){if(_modalData?.type==='names')renderNameList(_modalData.items,q);else if(_modalData?.type==='revs')renderRevList(_modalData.items,q)}
+function renderNameList(items,q){
+  const parsed=items.map(i=>{
+    const p=i.split('|');
+    const name=p[0],co=p.length===3?p[1]:null,dist=p.length===3?p[2]:null;
+    const geo=co||(projGeoMap[name]?.county);
+    const dst=dist||(projGeoMap[name]?.district);
+    const geoStr=geo?(dst?`${geo}·${dst}`:geo):'';
+    const val=valuableNameSet.has(name);
+    return{name,geo:geoStr,val};
+  });
+  const f=q?parsed.filter(({name,geo})=>(name+geo).toLowerCase().includes(q.toLowerCase())):parsed;
+  const list=document.getElementById('modal-list');
+  if(!f.length){list.innerHTML='<div class="empty-msg">無結果</div>';document.getElementById('modal-footer').textContent='';return}
+  list.innerHTML=f.map(({name,geo,val})=>`<div class="mod-item"><span class="mod-name">${name}</span><span class="mod-val-tag ${val?'v':'n'}">${val?'有價值':'無價值'}</span><span class="mod-geo">${geo}</span></div>`).join('');
+  document.getElementById('modal-footer').innerHTML=`<div class="mod-total-row"><span>共 ${f.length} 個建案</span></div>`;
+}
+function renderRevList(items,q){
+  const f=q?items.filter(({p})=>(p+(projGeoMap[p]?.county||'')).toLowerCase().includes(q.toLowerCase())):items;
+  const list=document.getElementById('modal-list');
+  if(!f.length){list.innerHTML='<div class="mod-empty">無符合結果</div>';document.getElementById('modal-footer').textContent='無符合結果';return}
+  const total=f.reduce((s,{r})=>s+r,0);
+  list.innerHTML=f.map(({p,r},i)=>{
+    const geo=projGeoMap[p];const geoStr=geo?(geo.district?`${geo.county}·${geo.district}`:geo.county||''):'';
+    const val=valuableNameSet.has(p);
+    return`<div class="mod-item"><span class="mod-name">${p}</span><span class="mod-val-tag ${val?'v':'n'}">${val?'有價值':'無價值'}</span><span class="mod-geo">${geoStr}</span><span class="mod-rev-val">${r.toLocaleString()}</span></div>`;
+  }).join('');
+  document.getElementById('modal-footer').innerHTML=`<div class="mod-total-row"><span>共 ${f.length} 個建案</span><span>合計：<strong>${total.toLocaleString()}</strong></span></div>`
+}
+// ── Helpers ──
+function growthFmt(p25,p26){if(!p25||!p26)return'-';const g=(p26/p25-1)*100;return(g>=0?'+':'')+g.toFixed(1)+'%'}
+function growthBadge(p25,p26,n25,n26){if(!n25||!n26||!p25||!p26)return'<span class="g-na">-</span>';const g=(p26/p25-1)*100;return`<span class="${g>=0?'g-pos':'g-neg'}">${g>=0?'+':''}${g.toFixed(1)}%</span>`}
+
+// \u2500\u2500 Cell helpers \u2500\u2500
+// nc: regular clickable count (blue)
+function nc(n,key,title,type){if(!n)return`<span class="num-zero">0</span>`;return`<span class="num-link" onclick="event.stopPropagation();showDetail('${key}','${esc(title)}','${type}')">${n.toLocaleString()}</span>`}
+// vc: valuable clickable count (purple)
+function vc(n,key,title){if(!n)return`<span class="num-zero">0</span>`;return`<span class="val-link" onclick="event.stopPropagation();showDetail('${key}','${esc(title)}','val')">${n.toLocaleString()}</span>`}
+// rc: revenue clickable (grey underline)
+function rc(rev,key,title){if(!rev&&rev!==0)return`<span class="g-na">-</span>`;if(rev===0)return`<span class="num-zero">0</span>`;return`<span class="rev-link" onclick="event.stopPropagation();showDetail('${key}','${esc(title)}','rev')">${rev.toLocaleString()}</span>`}
+
+// \u2500\u2500 Common \u2500\u2500
+function sid(s){return s.replace(/[\s(\uff08\uff09\u00b7)]/g,'_')}
+function fmt(n){return n!=null?Number(n).toLocaleString():'-'}
+function esc(s){return String(s).replace(/'/g,"&#39;").replace(/"/g,"&quot;")}
+function pct(n,d){return d?(n/d*100).toFixed(1)+'%':'-'}
+function rateClass(n,d){if(!d)return'none';const r=n/d;return r>=.15?'high':r>=.05?'mid':'low'}
+function badge(n,d){if(!d)return'<span class="badge-none">-</span>';return`<span class="badge badge-${rateClass(n,d)}">${pct(n,d)}</span>`}
+function barBadge(n,d){if(!d)return'<span class="badge-none">-</span>';const c=rateClass(n,d),w=Math.min(100,n/d*100).toFixed(1);return`<div class="bar-wrap"><div class="bar-bg"><div class="bar-fill bar-${c}" style="width:${w}%"></div></div><span class="badge badge-${c}">${pct(n,d)}</span></div>`}
+// Purple variants for \u6709\u4fa1\u5024
+function valBadge(n,d){if(!d)return'<span class="badge-none">-</span>';const c=rateClass(n,d);return`<span class="badge badge-val-${c}">${pct(n,d)}</span>`}
+function valBarBadge(n,d){if(!d)return'<span class="badge-none">-</span>';const c=rateClass(n,d),w=Math.min(100,n/d*100).toFixed(1);return`<div class="bar-wrap"><div class="bar-bg"><div class="bar-fill bar-val-${c}" style="width:${w}%"></div></div><span class="badge badge-val-${c}">${pct(n,d)}</span></div>`}
+// ── localStorage: save/load monthly online data ──
+function saveOnlineMonthly(){
+  try{
+    const obj={};
+    for(const[m,d]of Object.entries(onlineMonthly)){
+      obj[m]={all:[...d.all.entries()],val:[...d.val.entries()]}
+    }
+    localStorage.setItem('onlineMonthly_cache',JSON.stringify(obj));
+  }catch(e){console.warn('Failed to save cache:',e)}
+}
+function loadOnlineMonthly(){
+  try{
+    const raw=localStorage.getItem('onlineMonthly_cache');
+    if(!raw)return null;
+    const obj=JSON.parse(raw);
+    const result={};
+    for(const[m,d]of Object.entries(obj)){
+      result[parseInt(m)]={all:new Map(d.all),val:new Map(d.val)}
+    }
+    return result;
+  }catch(e){console.warn('Failed to load cache:',e);return null}
+}
+function clearOnlineCache(){
+  localStorage.removeItem('onlineMonthly_cache');
+  onlineMonthly={};onlineMap=new Map();valuableMap=new Map();valuableNameSet=new Set();
+  updateCacheStatus();
+}
+function updateCacheStatus(){
+  const el=document.getElementById('cache-status');if(!el)return;
+  const raw=localStorage.getItem('onlineMonthly_cache');
+  if(!raw){el.textContent='無快取';el.style.color='#94a3b8';return}
+  try{
+    const obj=JSON.parse(raw);
+    const months=Object.keys(obj).map(Number).sort((a,b)=>a-b);
+    el.textContent='快取：'+months.map(m=>m+'月').join('、');el.style.color='#059669';
+  }catch{el.textContent='快取異常';el.style.color='#dc2626'}
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+updateCacheStatus();
+</script>
+</body>
+</html>
