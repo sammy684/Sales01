@@ -247,25 +247,31 @@ function authLogout(){
   </div>
 </header>
 <main>
-  <div class="upload-grid">
-    <div class="upload-card" id="card-raw" onclick="document.getElementById('inp-raw').click()">
-      <div class="icon">📊</div><h3>RAW 業績報表 2026</h3>
-      <p class="desc">上傳「RAW業績報表_2026_已簽約業績_MMDD.xlsx」<br>滲透率 + 客單價皆使用</p>
-      <div class="pick-btn">選擇檔案</div>
-      <input type="file" id="inp-raw" accept=".xlsx,.xls" onchange="onRaw(this)">
-      <div class="file-list" id="lst-raw"></div>
+  <div id="upload-section">
+    <div class="upload-grid">
+      <div class="upload-card" id="card-raw" onclick="document.getElementById('inp-raw').click()">
+        <div class="icon">📊</div><h3>RAW 業績報表 2026</h3>
+        <p class="desc">上傳「RAW業績報表_2026_已簽約業績_MMDD.xlsx」<br>滲透率 + 客單價皆使用</p>
+        <div class="pick-btn">選擇檔案</div>
+        <input type="file" id="inp-raw" accept=".xlsx,.xls" onchange="onRaw(this)">
+        <div class="file-list" id="lst-raw"></div>
+      </div>
+      <div class="upload-card" id="card-online" onclick="document.getElementById('inp-online').click()">
+        <div class="icon">🏢</div><h3>在線建案數（滲透率專用）</h3>
+        <p class="desc">可上傳多份月份檔（可多選）<br>僅滲透率需要，可選擇性上傳</p>
+        <div class="pick-btn">選擇檔案（可多選）</div>
+        <div id="cache-status" style="font-size:11px;margin-top:6px;color:#94a3b8">無快取</div>
+        <div style="margin-top:4px"><button onclick="event.stopPropagation();clearOnlineCache()" style="font-size:10px;padding:2px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;cursor:pointer;color:#64748b">清除快取</button></div>
+        <input type="file" id="inp-online" accept=".xlsx,.xls" multiple onchange="onOnline(this)">
+        <div class="file-list" id="lst-online"></div>
+      </div>
     </div>
-    <div class="upload-card" id="card-online" onclick="document.getElementById('inp-online').click()">
-      <div class="icon">🏢</div><h3>在線建案數（滲透率專用）</h3>
-      <p class="desc">可上傳多份月份檔（可多選）<br>僅滲透率需要，可選擇性上傳</p>
-      <div class="pick-btn">選擇檔案（可多選）</div>
-      <div id="cache-status" style="font-size:11px;margin-top:6px;color:#94a3b8">無快取</div>
-      <div style="margin-top:4px"><button onclick="event.stopPropagation();clearOnlineCache()" style="font-size:10px;padding:2px 8px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;cursor:pointer;color:#64748b">清除快取</button></div>
-      <input type="file" id="inp-online" accept=".xlsx,.xls" multiple onchange="onOnline(this)">
-      <div class="file-list" id="lst-online"></div>
-    </div>
+    <button class="calc-btn" id="calc-btn" onclick="doCalc()" disabled>▶ 計算分析</button>
   </div>
-  <button class="calc-btn" id="calc-btn" onclick="doCalc()" disabled>▶ 計算分析</button>
+  <div id="data-info-bar" style="display:none;text-align:right;margin-bottom:10px">
+    <span style="font-size:12px;color:#64748b">📦 已載入內建資料（2026/06/22）</span>
+    <button onclick="toggleUploadSection()" style="margin-left:10px;font-size:11px;padding:3px 10px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;cursor:pointer;color:#475569">重新上傳資料 ▾</button>
+  </div>
   <div id="error-area"></div>
   <div id="results">
     <div class="feat-tabs">
@@ -1079,8 +1085,21 @@ function initStaticData(){
   const{allMap,valMap}=getOnlineMaps([1,2,3,4,5,6,7,8,9,10,11,12]);
   onlineMap=allMap;valuableMap=valMap;
   raw26Monthly=STATIC_RAW26;
+  // 隱藏上傳區，改顯示「資料已載入」提示列
+  const uploadSec=document.getElementById('upload-section');
+  if(uploadSec)uploadSec.style.display='none';
+  const infoBar=document.getElementById('data-info-bar');
+  if(infoBar)infoBar.style.display='block';
   document.getElementById('results').style.display='block';
   renderAll();
+}
+function toggleUploadSection(){
+  const sec=document.getElementById('upload-section');
+  if(!sec)return;
+  const visible=sec.style.display!=='none';
+  sec.style.display=visible?'none':'block';
+  const btn=document.querySelector('#data-info-bar button');
+  if(btn)btn.textContent=visible?'重新上傳資料 ▾':'收起上傳區 ▴';
 }
 function saveOnlineMonthly(){
   try{
