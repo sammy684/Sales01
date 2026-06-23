@@ -155,6 +155,7 @@
   #auth-logout-btn{padding:5px 14px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;font-size:12px;cursor:pointer;white-space:nowrap}
   #auth-logout-btn:hover{background:rgba(255,255,255,.35)}
 </style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -163,53 +164,58 @@
   <div id="auth-box">
     <div class="auth-logo">🏢</div>
     <h2>建案分析儀表板</h2>
-    <p class="auth-desc">請輸入您的姓名與密碼登入</p>
-    <input id="auth-name" type="text" placeholder="姓名（顯示用）" style="width:100%;padding:10px 14px;margin-bottom:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;box-sizing:border-box">
-    <input id="auth-pw" type="password" placeholder="密碼" style="width:100%;padding:10px 14px;margin-bottom:14px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;box-sizing:border-box" onkeydown="if(event.key==='Enter')doLogin()">
-    <button onclick="doLogin()" style="width:100%;padding:11px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-size:15px;cursor:pointer;font-weight:600">登入</button>
-    <div id="auth-error" style="display:none;margin-top:12px;color:#dc2626;font-size:13px"></div>
+    <p class="auth-desc">請使用 @digitm.com.tw 帳號登入</p>
+    <div id="g_signin_btn" style="display:flex;justify-content:center;margin-top:8px"></div>
+    <div id="auth-error" style="display:none;margin-top:12px;color:#dc2626;font-size:13px;text-align:center"></div>
   </div>
 </div>
 
 <script>
 // ── Auth logic (password mode) ──
-const AUTH_KEY='digitm_auth_v2';
-const AUTH_PW='digitm2026';
+const AUTH_KEY='digitm_gauth_v1';
+const ALLOWED_DOMAIN='digitm.com.tw';
 (function(){
   try{
     const s=sessionStorage.getItem(AUTH_KEY);
-    if(s){
-      const p=JSON.parse(s);
-      if(p.ok){
-        if(document.readyState==='loading'){
-          document.addEventListener('DOMContentLoaded',()=>{showUser(p.name||'使用者');setTimeout(initStaticData,50)});
-        } else {
-          showUser(p.name||'使用者');setTimeout(initStaticData,50);
-        }
-        return;
-      }
-    }
+    if(s){const p=JSON.parse(s);if(p.ok&&p.email&&p.email.endsWith('@'+ALLOWED_DOMAIN)){
+      if(document.readyState==='loading'){
+        document.addEventListener('DOMContentLoaded',()=>{showUser(p.name||p.email);setTimeout(initStaticData,50)});
+      }else{showUser(p.name||p.email);setTimeout(initStaticData,50)}
+      return;
+    }}
   }catch(e){}
   document.getElementById('auth-overlay').style.display='flex';
 })();
-
-function doLogin(){
-  const pw=document.getElementById('auth-pw').value;
-  const name=document.getElementById('auth-name').value.trim()||'使用者';
-  const err=document.getElementById('auth-error');
-  if(pw===AUTH_PW){
-    sessionStorage.setItem(AUTH_KEY,JSON.stringify({ok:true,name}));
+window.handleGoogleSignIn=function(response){
+  try{
+    const payload=JSON.parse(atob(response.credential.split('.')[1]));
+    const email=payload.email||'';
+    const name=payload.name||email;
+    const err=document.getElementById('auth-error');
+    if(!email.endsWith('@'+ALLOWED_DOMAIN)){
+      err.textContent='⚠️ 僅限 @'+ALLOWED_DOMAIN+' 帳號登入。';err.style.display='block';return;
+    }
+    sessionStorage.setItem(AUTH_KEY,JSON.stringify({ok:true,email,name}));
     document.getElementById('auth-overlay').style.display='none';
-    showUser(name);
-    setTimeout(initStaticData,0);
-  } else {
-    err.textContent='⚠️ 密碼錯誤，請重試。';
-    err.style.display='block';
-    document.getElementById('auth-pw').value='';
-    document.getElementById('auth-pw').focus();
+    showUser(name);setTimeout(initStaticData,0);
+  }catch(e){
+    const err=document.getElementById('auth-error');
+    err.textContent='⚠️ 登入失敗，請再試一次。';err.style.display='block';
   }
-}
-
+};
+window.addEventListener('load',function(){
+  if(document.getElementById('auth-overlay').style.display==='none')return;
+  if(typeof google==='undefined')return;
+  google.accounts.id.initialize({
+    client_id:'52430741509-6hdn88ekjjk9ee5rorb564ignkjd6jac.apps.googleusercontent.com',
+    callback:handleGoogleSignIn,
+    hd:ALLOWED_DOMAIN
+  });
+  google.accounts.id.renderButton(document.getElementById('g_signin_btn'),{
+    theme:'outline',size:'large',text:'signin_with',locale:'zh-TW',width:280
+  });
+  google.accounts.id.prompt();
+});
 function showUser(name){
   const el=document.getElementById('auth-user');
   if(el){el.style.display='flex';document.getElementById('auth-user-name').textContent=name;}
