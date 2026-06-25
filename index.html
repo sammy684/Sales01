@@ -188,7 +188,7 @@ const ALLOWED_DOMAIN='digitm.com.tw';
 })();
 window.handleGoogleSignIn=function(response){
   try{
-    const payload=JSON.parse(atob(response.credential.split('.')[1]));
+    const b64=response.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');const payload=JSON.parse(atob(b64));
     const email=payload.email||'';
     const name=payload.name||email;
     const err=document.getElementById('auth-error');
