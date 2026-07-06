@@ -666,7 +666,7 @@ async function doCalc(){
     rawRecords=parseRaw(rawWb);raw26Monthly=parseRaw26ForUnit(rawWb);
     // Build projGeoMap from RAW records
     projGeoMap={};
-    for(const r of filteredRecs){if(r.project&&!projGeoMap[r.project])projGeoMap[r.project]={county:r.county,district:r.district}}
+    for(const r of rawRecords){if(r.project&&!projGeoMap[r.project])projGeoMap[r.project]={county:r.county,district:r.district}}
     for(const[,dks] of Object.entries(DATA_2025_PROJ||{}))for(const[dk,projs] of Object.entries(dks)){const[co,di]=dk.split('|');for(const proj of Object.keys(projs))if(proj&&!projGeoMap[proj])projGeoMap[proj]={county:co||null,district:di||null}}
     for(const[,ad]of Object.entries(raw26Monthly||{}))for(const[,dd]of Object.entries(ad.dks))for(const proj of Object.keys(dd.projects))if(!projGeoMap[proj])projGeoMap[proj]={county:dd.county,district:dd.district};
     if(onlineFiles.length>0){
