@@ -888,6 +888,33 @@ function penL2Gray(pid,lbl,cs){
   const cvk=storeNames(csv),cnk=storeNames(csn),ck=storeNames(cs);
   return`<tr class="r-lv2 hidden" data-p="${pid}" style="background:#f7f7f7"><td style="color:#bbb">${lbl}</td><td style="color:#c5b0d0">${nc(csv.size,cvk,lbl+' 有價值合作','coop')}</td><td style="color:#bbb">${nc(csn.size,cnk,lbl+' 無價值合作','coop')}</td><td style="color:#bbb">${nc(cs.size,ck,lbl+' 合作','coop')}</td><td class="sep-col" style="color:#ddd">-</td><td style="color:#ddd">-</td><td class="sep-col" style="color:#ddd">-</td><td style="color:#ddd">-</td></tr>`
 }
+// Get agent's responsible-district 2025 unit price totals
+function getAgRespUnit25(ag){
+  const terr=AGENT_TERRITORY[ag];
+  if(!terr)return null;
+  let n=0,rev=0;const PR={};
+  for(const[dk,prMap]of Object.entries(DATA_2025_PROJ[ag]||{})){
+    const p=dk.split('|');
+    if(isAgTerrDist(ag,p[0]||'',p[1]||'')!==false){n+=Object.keys(prMap).length;rev+=Object.values(prMap).reduce((s,v)=>s+v,0);Object.assign(PR,prMap)}
+  }
+  return{n,rev:Math.round(rev),PR}
+}
+// Get agent's responsible-district 2026 unit price totals
+function getAgRespUnit26(ag,a26){
+  const terr=AGENT_TERRITORY[ag];
+  if(!terr)return a26;
+  let n=0,rev=0;const PR={};
+  for(const[dk,dd]of Object.entries(a26.districts||{})){
+    const p=dk.split('|');
+    if(isAgTerrDist(ag,p[0]||'',p[1]||'')!==false){n+=dd.n||0;rev+=dd.rev||0;Object.assign(PR,dd.PR||{})}
+  }
+  return{n,rev,PR}
+}
+// Gray district row for non-responsible areas in unit price table (counts only, no price/growth)
+function uL2Gray(pid,lbl,sc,d25n,d26n){
+  const k25n=storeNames(get25Names(sc)),k26n=storeNames(get26Names(sc));
+  return`<tr class="r-lv2 hidden" data-p="${pid}" style="background:#f7f7f7"><td style="color:#bbb">${lbl}</td><td style="color:#bbb">${d25n?nc(d25n,k25n,lbl+' 2025','coop'):'-'}</td><td style="color:#ddd">-</td><td style="color:#ddd">-</td><td style="color:#bbb">${d26n?nc(d26n,k26n,lbl+' 2026','coop'):'-'}</td><td style="color:#ddd">-</td><td style="color:#ddd">-</td><td style="color:#ddd">-</td></tr>`
+}
 
 // ── County sort ──
 const COUNTY_ORDER=['基隆市','臺北市','台北市','新北市','桃園市','新竹市','新竹縣','苗栗縣','臺中市','台中市','彰化縣','南投縣','雲林縣','嘉義市','嘉義縣','臺南市','台南市','高雄市','屏東縣','臺東縣','台東縣','花蓮縣','宜蘭縣','澎湖縣','金門縣','連江縣'];
@@ -1063,17 +1090,50 @@ function unitAgTable(){
   const ta={};for(const ag of allAg){const tm=cur26.agents[ag]?.team||cur25.agents[ag]?.team||'(\u672a\u5206\u7d44)';if(!ta[tm])ta[tm]=new Set();ta[tm].add(ag)}
   let rows=uTotalRow();
   for(const tm of sortTeams(ta)){
-    const d25=cur25.teams[tm]||{n:0,rev:0},d26=cur26.teams[tm]||{n:0,rev:0,PR:{}};
-    const tid='utm_'+sid(tm);rows+=uL0(tid,tm,d25,d26,{type:'team',team:tm});
+    const tid='utm_'+sid(tm);
+    // Group totals = sum of each agent's responsible-district data
+    let tm25={n:0,rev:0},tm26={n:0,rev:0};
+    for(const ag of ta[tm]){
+      const a25=cur25.agents[ag]||{n:0,rev:0};
+      const a26=cur26.agents[ag]||{n:0,rev:0,PR:{},districts:{}};
+      const r25=getAgRespUnit25(ag)||a25;
+      const r26=getAgRespUnit26(ag,a26);
+      tm25.n+=r25.n||0;tm25.rev+=r25.rev||0;
+      tm26.n+=r26.n||0;tm26.rev+=r26.rev||0;
+    }
+    rows+=uL0(tid,tm,tm25,tm26,{type:'team',team:tm});
     for(const ag of [...ta[tm]].sort((a,b)=>(cur26.agents[b]?.n||0)-(cur26.agents[a]?.n||0))){
-      const a25=cur25.agents[ag]||{n:0,rev:0},a26=cur26.agents[ag]||{n:0,rev:0,PR:{},districts:{}};
-      const aid='uag_'+tid+'_'+sid(ag);rows+=uL1(aid,tid,ag,a25,a26,{type:'agent',agent:ag});
+      const a25=cur25.agents[ag]||{n:0,rev:0};
+      const a26=cur26.agents[ag]||{n:0,rev:0,PR:{},districts:{}};
+      const aid='uag_'+tid+'_'+sid(ag);
+      // Agent totals = only responsible districts
+      const ag25=getAgRespUnit25(ag)||a25;
+      const ag26=getAgRespUnit26(ag,a26);
+      const tip=agTerrTooltip(ag);
+      const agLbl=tip?`<span title="${tip.replace(/"/g,'&quot;')}" style="border-bottom:1px dotted #999;cursor:help">${ag}</span>`:ag;
+      rows+=uL1(aid,tid,agLbl,ag25,ag26,{type:'agent',agent:ag});
+      // Districts: responsible shown normally, non-responsible in gray section
       const allDks=new Set([...Object.keys(DATA_2025_PROJ[ag]||{}),...Object.keys(a26.districts)]);
-      for(const dk of [...allDks].sort((x,y)=>(a26.districts[y]?.n||0)-(a26.districts[x]?.n||0))){
+      const sortedDks=[...allDks].sort((x,y)=>(a26.districts[y]?.n||0)-(a26.districts[x]?.n||0));
+      const nonRespDks=[];
+      for(const dk of sortedDks){
+        const p=dk.split('|');const county=p[0]||'',district=p[1]||'';
+        const inT=isAgTerrDist(ag,county,district);
+        if(inT===false){nonRespDks.push(dk);continue}
         const dd25_pr=DATA_2025_PROJ[ag]?.[dk]||{},dd25_n=Object.keys(dd25_pr).length,dd25_r=Object.values(dd25_pr).reduce((s,v)=>s+v,0);
         const dd26=a26.districts[dk]||{n:0,rev:0,PR:{}};
-        const parts=dk.split('|');const lbl=[parts[0],parts[1]].filter(Boolean).join(' \u00b7 ');
+        const lbl=[county,district].filter(Boolean).join(' \u00b7 ');
         rows+=uL2(aid,lbl,{n:dd25_n,rev:dd25_r},{n:dd26.n,rev:dd26.rev},{type:'agent-dk',agent:ag,dk})
+      }
+      if(nonRespDks.length>0){
+        rows+=`<tr class="r-lv2 hidden" data-p="${aid}"><td colspan="8" style="background:#f0f0f0;color:#bbb;font-size:11px;padding:3px 8px 3px 36px;border-top:1px dashed #e0e0e0">\u2500\u2500 \u975e\u8ca0\u8cac\u5340\u57df\uff08\u4e0d\u8a08\u5165\u4e0a\u65b9\u7d71\u8a08\uff09\u2500\u2500</td></tr>`;
+        for(const dk of nonRespDks){
+          const p=dk.split('|');const county=p[0]||'',district=p[1]||'';
+          const dd25_pr=DATA_2025_PROJ[ag]?.[dk]||{},dd25_n=Object.keys(dd25_pr).length;
+          const dd26=a26.districts[dk]||{n:0,rev:0};
+          const lbl=[county,district].filter(Boolean).join(' \u00b7 ');
+          rows+=uL2Gray(aid,lbl,{type:'agent-dk',agent:ag,dk},dd25_n,dd26.n)
+        }
       }
     }
   }
