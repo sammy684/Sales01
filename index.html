@@ -331,6 +331,7 @@ function authLogout(){
         <div class="dim-tabs">
           <button class="dim-btn active" id="tab-pen-ag" onclick="switchPenDim('ag')">📋 業務維度</button>
           <button class="dim-btn" id="tab-pen-cn" onclick="switchPenDim('cn')">🗺️ 縣市維度</button>
+          <button class="dim-btn" id="tab-pen-b3" onclick="switchPenDim('b3')">🎯 業三組專屬</button>
         </div>
         <div style="flex:1"></div>
         <input class="search-box" id="pen-search" type="text" placeholder="🔍 搜尋…" oninput="onPenSearch(this.value)">
@@ -349,6 +350,7 @@ function authLogout(){
         <div class="table-wrap">
           <div id="view-pen-ag"></div>
           <div id="view-pen-cn" style="display:none"></div>
+          <div id="view-pen-b3" style="display:none"></div>
         </div>
       </div>
     </div>
@@ -859,6 +861,8 @@ const AGENT_TERRITORY={
   '張瑋秦':[{county:'花蓮縣',districts:['花蓮市','吉安鄉','玉里鎮','新城鄉','秀林鄉','壽豐鄉','光復鄉','瑞穗鄉','鳳林鎮','富里鄉','萬榮鄉','卓溪鄉','豐濱鄉']}],
   '趙斯蓓':[{county:'宜蘭縣',districts:['冬山鄉','五結鄉','蘇澳鎮','頭城鎮','壯圍鄉']}]
 };
+// 業三組專屬在線建案清單（依業務員分配，key=county|district，a=全部，v=有價值）
+const B3_ONLINE={"曾家羚":{"台中市|北屯區":{"a":["鴻邑雲山硯","亞昕一緻","德鑫森PARK","國聚之瑑","盛築玥","琢寓","磐居-智慧家Ⅱ","駿寳VILLA","睿馥君和","櫻花柳川之櫻","德鑫一璟","寬展緣森","遠雄敦富","富宇原上琚","鉅虹R&G","元城上階綠","磐興寬境","浩瀚景立方-菁英區","鼎銓初森","仁山沐華","雋業V雋","金林梧境","浩瀚創立方4x4","豐謙HOME+","雅正VII","和樂府","圓堡睦霖","豐潤自在","惠宇MY PARK","雅敦崇德序3","大城知丘","鴻邑松崨境","熊圖敘Dos","詠丞品藏","大城吾界","鼎佳興境","靜樂敦和","唐臣上青","豐邑 豐穗","大映奕居","大城光年","裕翔研山","帝璟寬和","ANEW","文心O'LIVE","之序","庭林群青","鴻承壹流","豐邑 豐禾","雲品謙恆","森活臻城","大山謙里","琢岳","翔禾藏媺2-云詠","八展首富26期","虹府敦和Ⅱ","舜元境朗","浩瀚景立方-層峰區","立彩時盛川","永隆陞景上居","華太怡人","磐興寬悅","大毅一嶼","一品院","晟溢大觀7","樂宇禮寓","情定水蓮No.16","原生三璽","泓瑞順世代","吾所衛","冠典鑽","高峰領袖八期","品創Rich One-東京館","原生七境","國敬典藏","八展洲際首富","興富安邸","晟溢驛湛","坤悅‧泊岳","鉅虹映一彎綠","新業V&A","舜元悟野","昌祐又一景","坤聯發建設崇德路案","泓瑞洲際之森","協勝洲際ONE","米蘭公寓","豐穀耘四季","永尚謙玥","光語卉","三鼎太順","風尚須彌","嶼 COZY","惠田好日子","品臻曦","惠宇和慕","富宇琚山境","宜陞建設美和段案","亞昕嶼森","澄石謙墨","上裕經貿NO.2","富華澐光","富比世2","淳品仁美","東揚臻品2","均福匯","松竹敦富","京日晶日","首席雲端10","晟溢大觀8","遠雄丰尚","嶼宮源","大泓仁美","冠德崇德綻","蓉稼醇華","海洺薪安","富宇建設平田段案","天樂藏森","陸一慕森","敦和居","鴻邑建設文心路案","大耀明興","光之御邸","久樘歐森","晟溢光御III","勝旺美和","御澤大境","勝華建設溝背段案","柏寓","靜樂松柏2","大隱之上","晟溢建設軍和段案"],"v":["德鑫森PARK","國聚之瑑","櫻花柳川之櫻","遠雄敦富","富宇原上琚","鉅虹R&G","浩瀚景立方-菁英區","仁山沐華","金林梧境","豐謙HOME+","惠宇MY PARK","大城知丘","鴻邑松崨境","熊圖敘Dos","大城吾界","大映奕居","文心O'LIVE","之序","浩瀚景立方-層峰區","磐興寬悅","情定水蓮No.16","原生七境","坤悅‧泊岳","新業V&A","舜元悟野","昌祐又一景","泓瑞洲際之森","永尚謙玥","惠田好日子","惠宇和慕","亞昕嶼森","澄石謙墨","松竹敦富","遠雄丰尚","富宇建設平田段案","陸一慕森","鴻邑建設文心路案","久樘歐森","勝旺美和","勝華建設溝背段案","靜樂松柏2","大隱之上","晟溢建設軍和段案"]},"台中市|龍井區":{"a":["砌植花園","德光大智","晨右 又一村(透天)","豐禾年年","萬仕達光禾-豐禾區","璞邑恆樂","富園一品","勝邦綠邑7","聚恆光語繪(透天)","林維洄東海","御墅富樂","佳美建設中山段案","臻上美8","綠園臻品11","萬基築玥-映月","興昇霖語東海","新觀NO.6","亞灣築泉","保辰一森園","茂洋馥域","晨右 又一村(華廈)","田庄吾寓","茂洋晴山洋洋","築真心","宏泉IN中央","元心.東海101","喬立浥品","鉑金府","鋮豐富穥","欣興莎田","田庄序","富貴莊園7","新觀序","萬仕達光禾-晨光區","富騰漾HOUSE","臻里仁8","宣邑璞玉","大樁雍容","東海知丘","浩斯建設中社段案"],"v":["德光大智","晨右 又一村(透天)","晨右 又一村(華廈)","喬立浥品","萬仕達光禾-晨光區","浩斯建設中社段案"]},"台中市|南區":{"a":["國聚之邑","X CITY昌祐雲之境","曜精銳","高工湛","五權知鈺","U HOUSE","國聚之尚","坤悅語文心","和瑞文心樂章","登陽大地悅章","鼎義國圖館","儷豐画上川","和立堡蒔晴","泓瑞恆昕","彧見","惠宇大然","梧桐富築","森宇樂慕","隱大藴","浩瀚光与玥","敦富木白","鑫鈺知境","百共‧SUI","恆山千隅","鎮宇森語間","和瑞忠明滙","里居","漢喻開發下橋子頭段案","國圖綠園道","逸竑建設頂橋子頭段案(尚未取得建照)","富御景"],"v":["曜精銳","國聚之尚","坤悅語文心","和瑞文心樂章","登陽大地悅章","惠宇大然","浩瀚光与玥","百共‧SUI","鎮宇森語間","和瑞忠明滙","里居","漢喻開發下橋子頭段案","逸竑建設頂橋子頭段案(尚未取得建照)","富御景"]},"台中市|南屯區":{"a":["國聚之築","國聚之見","鉅虹天麗","鉅虹天蒔","鉅虹蒔荃","鉅虹蒔美","泓瑞5號樂章","富宇市政大道","惠宇THE ALPHA","惠宇悅然"],"v":["鉅虹蒔荃","鉅虹蒔美","泓瑞5號樂章","富宇市政大道","惠宇THE ALPHA","惠宇悅然"]},"台中市|豐原區":{"a":["宇苑丰采","大宅豐鼎","晴山白里","坤聯富豐原匯","東方大苑","和碁澄園","贊騰有悅","帝堡NO.33-富苑藏豐","寶宇丰蘊","慶山明仁","南陽敦峰","映豐青","寬禾寓見","環東天廈","沅宬樹見築","慶山豐南","同學匯","晟助常丰","馥寓3","南陽軒閣","禹田禾禾南陽","悅光2","書香郡","澔宇築樂","喜全築白","慶山合作","勝美豐原Ⅱ","綠寶石"],"v":["大宅豐鼎","坤聯富豐原匯","東方大苑","慶山明仁","澔宇築樂","喜全築白","慶山合作","勝美豐原Ⅱ"]},"台中市|清水區":{"a":["興旺傳家","日光森活","歐樂居","清水觀止","四季春風","大漁","鼎佳謙美","佺築鰲峰MOMA","餘慶豐閣二期","聯悦馥","良鉅柒尚","嘉麗WINNER","兆國 I Style","兆奕建設仁愛路案","立東峰采","兆國琢藝","明日享享","鞍騰新","尚億麗景6期","俊邦植青","春虹建設市鎮北段案","長虹天韻","櫻花市鎮之櫻","佳泰琢閱","鴻山清水禮","昌銳明日綻","兆登拾光序","新業織光森鄰","大樁高美苑","上睿閱好","誠居臻綻(公寓)","誠居臻綻(透天)","微笑臻美","伊吉邦豐盈","俊邦植青2","格太富邑"],"v":["鼎佳謙美","佺築鰲峰MOMA","嘉麗WINNER","兆國琢藝","佳泰琢閱","鴻山清水禮","昌銳明日綻","伊吉邦豐盈"]},"台中市|東勢區":{"a":["綠誠勢2","綠誠勢","勢中心2","大悦江山","奇品臻美","惠來上景3 御山景","第三大道","富之園-福隆特區","兆國上東琚(透天)","興泰天品","奇品臻典","上城賦I","上城賦II","荷睦NO.3","兆國上東琚(華廈)","東勢高工墅","全美豐景"],"v":[]},"台中市|新社區":{"a":["森林花園","新社原墅","大隱之美2-新月天空","上寯邑朗朗","樹根榛邸","森活家","上寯四季朗朗","陽明莊園10"],"v":[]},"台中市|大安區":{"a":["富甲安邦","晴越安居","臻墅壐","花園島Villa","君品NO.8"],"v":[]},"台中市|沙鹿區":{"a":["茂洋天玥META"],"v":["茂洋天玥META"]},"台中市|大肚區":{"a":["茂洋旭美","允將青曦"],"v":["茂洋旭美","允將青曦"]},"台中市|西屯區":{"a":["達麗拾穗","富宇富美圖","和瑞文華樂章","雅敦蔚山","雅敦謙山","富華建設文商段案"],"v":["達麗拾穗","富宇富美圖","和瑞文華樂章","雅敦蔚山","雅敦謙山","富華建設文商段案"]},"台中市|太平區":{"a":["聚佳大值","櫻花建設福億段案"],"v":["聚佳大值","櫻花建設福億段案"]},"台中市|大甲區":{"a":["櫻花大甲之櫻"],"v":["櫻花大甲之櫻"]},"台中市|大雅區":{"a":["雅謐秀山"],"v":["雅謐秀山"]},"台中市|北區":{"a":["嶼76"],"v":["嶼76"]},"台中市|大里區":{"a":["亞昕國際大仁段案(尚未取得建照)","舜元出雲"],"v":["亞昕國際大仁段案(尚未取得建照)"]}},"陳琬臻":{"台中市|北屯區":{"a":["登陽釀時光","登陽上清宇","豐邑太原YES","登陽華境","登陽華馥","惠國清澄の境","THE精銳","久樘歐森","原潮APT","和宜景美","漢宇雲衍"],"v":["豐邑太原YES","登陽華境","登陽華馥","THE精銳","久樘歐森","原潮APT","和宜景美","漢宇雲衍"]},"台中市|大里區":{"a":["登陽閲涵","登陽康橋景美","麗馳麗景17期"],"v":["登陽康橋景美","麗馳麗景17期"]},"台中市|烏日區":{"a":["登陽 ICC."],"v":[]},"台中市|南屯區":{"a":["登陽明日昇","精銳LEAD","豐邑泊金灣","順天NEVERLAND 夢·島","文心愛悦","博識","亞昕織御"],"v":["登陽明日昇","精銳LEAD","豐邑泊金灣","順天NEVERLAND 夢·島","亞昕織御"]},"台中市|沙鹿區":{"a":["惠國麓境","精銳建設南勢東段案"],"v":["惠國麓境"]},"台中市|南區":{"a":["登陽大地悅章"],"v":["登陽大地悅章"]},"台中市|龍井區":{"a":["精銳WORLD","精銳WORLD","精銳WORLD"],"v":[]},"台中市|梧棲區":{"a":["精銳錦"],"v":[]},"台中市|豐原區":{"a":["久樘雋陽"],"v":["久樘雋陽"]},"台中市|太平區":{"a":["順天蘊華","坤悅涵仰","大樁陶然園","鴻邑璞樹謙里","和宜上美","聚悅澄心","日升樂築Ⅱ期","墅立方3期","錢連鋼骨双併","長平kotikoti","穩喬澄里2","瓏府","十二淳","水玥新光","御閑之森","玥寬庭","錢連全联","品自在Ⅱ","基創悅渼","順天緮華","三上","長平晴境","城鈺深晴","日升樂築Ⅲ","日升樂築Ⅰ期","大興家園","麗馳麗景16期","城鈺深晴二期","佑崧豐祿","贊騰有容","蓉稼映美墅","長平百富","八展首富No.27","長億常聚","宇安居","藏億傳家","春福興波","春福康波","由鉅建設．敘真","城鈺森川","八展首富No.29","大甲春水硯","東城苑5","懷洛宇園墅","佑崧至臻","大觀遠耀鑫","森原樹上","悠然清境2","禾力智博 AI旗艦總部","日升拾尚","八展首富No.30","展沅悅居2","誠家御見","八展首富No.31","秉和建設豐中段案"],"v":["坤悅涵仰","長平kotikoti","藏億傳家","由鉅建設．敘真","佑崧至臻","日升拾尚","展沅悅居2","秉和建設豐中段案"]},"台中市|西屯區":{"a":["國雄無双","富旺天際W ONE","雍悦一方","坤聯發中科匯","遠雄洄山行","赫里翁城堡","蘿曼蘿蘭","宜園 一青隱","雲頂","尉寶大敦主人","VVS1","親家雲硯","裕翔織光","大樁園8","台中TOP1環球經貿中心","鉑金愛悦","鈺陞璞玉","市政壹號廣場","臺中帝寶","福星匯","麗晨花果山","品創Rich One-紐約館","磐鈺雲詠","成真 Come True","麗晨片片山閑","當代首馥","市政愛悅","育堂序麗","聚合發獨秀","怡山自在","逢鳴日向微風","勝美上安","松承青衖","惠田天玥","仁山山之道","森知道","逢甲101 No.2","仰星殿","禾盛福科森活","市政新銳","紀汎希","泰御Sky Island","逢甲301","臻和康和玥","德鑫協和","東方原序","中科樸墅","微笑巨蛋","澄捷現","門門一合院","聚碩仁玉","倉和蘭亭","新竣建設成都路案","禾雅墅","丽富HORI","亞昕THE ARC","未來習作","宏廈珩豐"],"v":["國雄無双","遠雄洄山行","蘿曼蘿蘭","雲頂","尉寶大敦主人","VVS1","裕翔織光","大樁園8","麗晨片片山閑","當代首馥","育堂序麗","勝美上安","松承青衖","惠田天玥","紀汎希","泰御Sky Island","德鑫協和","微笑巨蛋","聚碩仁玉","新竣建設成都路案","亞昕THE ARC","未來習作","宏廈珩豐"]},"台中市|潭子區":{"a":["家鼎知山田","勝發賀","富貴狀元墅","弘文豐墅","家福7","匯有大及第","匯有大贏家NO.3","上寯崇德朗朗5","聚佳豐美","六境","誠總弘文大苑","順福520","合創旭苑"],"v":["聚佳豐美","順福520"]},"台中市|中區":{"a":["昂峰京澄","時代公園大廈-DIAMOND TOWER","DE左岸","元心藏馥","鴻邑瑞錦","寶宇丰樂","台中PARK","九上．州廳","致富聯盟Ⅱ"],"v":["昂峰京澄","時代公園大廈-DIAMOND TOWER","鴻邑瑞錦","台中PARK","九上．州廳","致富聯盟Ⅱ"]},"台中市|西區":{"a":["鉅日若谷","鈺陞悠居","鈺陞御品","冠邸","泉宇丰格","富旺千蘊","築優心晴","都心寓所","勤美之森","勤美之真","鼎義國美館","鼎泰上珹","博館268","臻鑽建設中民段六小段案","立吉富建設後壠子段案"],"v":["富旺千蘊","勤美之真","鼎泰上珹","臻鑽建設中民段六小段案","立吉富建設後壠子段案"]},"台中市|神岡區":{"a":["高威豐璟尊爵","瑧璟璞萃","寬埕裏厚院","敦斐謙和樂","雲見朗朗","我是精英-陽光","葫蘆墩Golden Park","木森福隆","良聚知樂","上雋金色朗朗NO.2","宸家楓悅NO.8","傑瀚綠園首璽","合揚沐丰華","鉅程之作","逸竑逸築","晶鑽吾璽","宏德植上","時光樹語","鉅程逸墅","馥麗9","宇苑建設中山路案"],"v":["宇苑建設中山路案"]},"台中市|東區":{"a":["聚悅臻心","浩瀚湖濱城","謙18","登鴻富御","登鴻新時代","允將沐溡","安美城心","宏廈青川","璞翫寓所","松承領峰","時代開發建設東英路案","順宇時代滙","新高開發旱溪段案"],"v":["聚悅臻心","浩瀚湖濱城","謙18","允將沐溡","宏廈青川","璞翫寓所","時代開發建設東英路案","新高開發旱溪段案"]},"台中市|大雅區":{"a":["元心大雅湛","書香莊園","福馨愛圓滿","誠總上楓湛","中科峇里島16","大雙喜18","合揚錸特莊園","欣居UPUP2","坤聯發大雅匯","幸福城5","豐禾大哲","大雅之堂","中科峇里島17","興宸三和","宜園之青"],"v":["坤聯發大雅匯","豐禾大哲","宜園之青"]},"台中市|石岡區":{"a":["磐月四季城","石岡八富2-森悅家","春陽自在森林","禹田禾好實崗","豐市","香草天空Ⅲ","禹田禾．閱雲出3"],"v":["磐月四季城","香草天空Ⅲ"]},"台中市|大肚區":{"a":["悦里仁5","昇佳閤邑","錦繡年年","北鑫与森鄰","亞灣博樂","茂洋閱美","樂陶居","里仁唯美2","山水雲光","宏泉小嶼大作","永順禮2"],"v":["宏泉小嶼大作","永順禮2"]},"台中市|大甲區":{"a":["幼獅海灣","大甲湛","墅天下","瑞鑫君悅(透天)","帝堡NO.28","翔賀居No.18","瑞鑫君悅(公寓)","和太臻鑽","理想大地","奕安居六期","展裕中山大道","天后","凱富上謙","晴越巨富","大砌天下No.12","樺懋一品花園","太昇森鄰II"],"v":["大甲湛","瑞鑫君悅(透天)","帝堡NO.28","晴越巨富","樺懋一品花園"]},"台中市|北區":{"a":["順天謙華"],"v":[]}},"呂佩宜":{"台中市|清水區":{"a":["中山大道","富宇大悦","富宇大琚","遠雄星呈","富宇蒔光","富宇建設銀聯段案"],"v":["中山大道","富宇大琚","遠雄星呈","富宇蒔光"]},"台中市|北屯區":{"a":["高綺幸匯","富宇鉑金大苑","富宇藏富","遠雄樂元","富宇建設平田段案","海銘琢院"],"v":["遠雄樂元","富宇建設平田段案"]},"台中市|南區":{"a":["富宇玥和","富宇上和苑"],"v":["富宇玥和"]},"台中市|龍井區":{"a":["富宇大地","櫻花向上之櫻","鴻豫建設龍崗段案"],"v":["櫻花向上之櫻"]},"台中市|豐原區":{"a":["坤聯富原粹"],"v":[]},"台中市|潭子區":{"a":["昌祐捷作"],"v":[]},"台中市|東區":{"a":["泓瑞拉拉漾","坤聯富馥琚"],"v":["泓瑞拉拉漾"]},"台中市|太平區":{"a":["坤聯富詠琚"],"v":[]},"台中市|西屯區":{"a":["遠雄夏綠蒂","遠雄琉蘊","遠雄綠美"],"v":["遠雄夏綠蒂","遠雄琉蘊"]},"台中市|后里區":{"a":["富旺敦厚","亞悦櫻悦家","馨懋里想居2","玉守","花宅日麗","坤悅禮御","水白墅","四季大院","樹根菁英匯","后科美美","青禾","華亞青田","后里富No.3","展裕丰格","后科尚美","摩天城","銘佳最美","美光自在","玄鴻首賦-后里","恆詠好漾","恆詠之星","輕嵩美光2","冠霖禾豐Ⅲ","光耀后科-后科1時代6期","曉富婆","誠居后花園","佳豪大悦","科鉑悅","后麗18","彩匯居二期","富茂鼎峰12","詠砌謙里","銘佳更美","花博天品7","后科朗朗"],"v":["富旺敦厚","誠居后花園","佳豪大悦","富茂鼎峰12","詠砌謙里","后科朗朗"]},"台中市|沙鹿區":{"a":["勝麗交響曲","皇家極光","德光星綻","坤悅沐光邸","大樁謙隱園","坤悅沐光墅","鹿鳴寓所","富宇漾","森邸","大樁十六韻Ⅱ","哲宇CASA+","大稻埕禮御","綠光計畫NO.5步青雲","富宇雅築","勝美.向上","富宇時代花園","采翔富鈺","澄石慕上","住寅純萃","德光興境","餘慶有鄰","兆登櫻","富宇中山匯","住寅大晶囍","富宇時代御所","富宇臻藏","帝堡NO.32","泉美御明秀","佳瓚鹿瓚","享富寓5","帝堡NO.31","凱悅愛My市","麗景風和","鴻豫境","豪威淳境","保辰一森恬","宸堡建設興安段案","過洋居","侑峰鑫生活","富宇時代之丘","凱悅MOMA(華廈)","沙鹿小鎮","品悅三期","佳格美墅","綠光計畫NO.8 鴻山臻藏","榛富","富宇光嶼","敬益淳境","安城築美","富德星耀","如泉如意","德光興富","華偉知見","坤悅映光田","佳瓚大讚","築厝別墅","中科与森2","坤聯富智富+","盛亞建設明秀段案","永築承境","宣邑鴻運","天府養真","萬大青禾","亞哥織境","碧國頤府之森"],"v":["德光星綻","坤悅沐光邸","富宇漾","大樁十六韻Ⅱ","大稻埕禮御","勝美.向上","住寅純萃","餘慶有鄰","富宇中山匯","佳瓚鹿瓚","保辰一森恬","富宇光嶼","華偉知見","坤悅映光田","佳瓚大讚","坤聯富智富+","盛亞建設明秀段案","宣邑鴻運","天府養真","亞哥織境","碧國頤府之森"]},"台中市|南屯區":{"a":["陸禾誠寓所","麗晨語山簷","勝美琚","國泰森林薈","敘山行路","坤悅君睿","國聚之穎","侑信藏玥3","中陽旭月","育堂十三苑","嘉磐惠文","豐謙植得","聖揚樂晴空","泰御天鑄","睦唐與樹","揆峰華","華揚三境","蕼禧","睦昇八玥","聚富粼粼","菁自在-觀恆","豐邑G TOWER","南悅樂田","碧根印白","齊又新執善","鉅森匯","南悅喜苑","琢力自然","侑美謙回","麗明四季","厚德大院","佳泰大方","益豐莊園主人","元城生生","前瞻13","寶樺境溪行","沅林．清麒","麗晨山哼歌","鼎一森之硯","余泰然","圓堡墪青","恬恬所在","鉅陞藏賦","敦風苑","馥玉","惠宇大其心","禾盛富精科2","成太澄美","樂樂璵里","國泰蒔萃","豐邑翫美","寶璟乾元","晨朗吾与森","睦昇韶光漫","和宜真美","宜園大院","臻和康璞玥","勝旺悅","光隆ONE PARK","文森匯","石云尹之居","鉅陞大藴","永隆陞建設昌明段案","永隆陞建設大墩南一街案","茂居芮上","展麗開發永春段案","沅宬玉見築","京祐建設永富段案(尚未取得建照)","青園綠境","精晨LIFE SHOW","日沐森"],"v":["國泰森林薈","國聚之穎","育堂十三苑","豐謙植得","聚富粼粼","豐邑G TOWER","南悅樂田","碧根印白","齊又新執善","琢力自然","侑美謙回","益豐莊園主人","元城生生","寶樺境溪行","沅林．清麒","圓堡墪青","鉅陞藏賦","樂樂璵里","國泰蒔萃","豐邑翫美","睦昇韶光漫","和宜真美","宜園大院","勝旺悅","光隆ONE PARK","文森匯","石云尹之居","鉅陞大藴","永隆陞建設昌明段案","永隆陞建設大墩南一街案","茂居芮上","展麗開發永春段案","沅宬玉見築","京祐建設永富段案(尚未取得建照)","青園綠境","精晨LIFE SHOW","日沐森"]},"台中市|霧峰區":{"a":["百昱海德堡莊園","銳宇寬仁","晴山御花園","君祐豐匯","森樂府","亞大墅","富貴京品","滙中正","金億興建設新厝段案"],"v":["晴山御花園","金億興建設新厝段案"]},"台中市|大里區":{"a":["大隱之美NO3.品日子","昌祐 幸福大里","滙文心","大漁仁美","晴田居","富宇科研双星","知趣泊安","林維躍於","工妍院二期","映月","新葉莊","心閱埕","富宇曙光之森","欣康橋","一邸","富暘 ‧ 花悅II","昂峰馥築","曼哈頓(透天)","德雍里想+JIA","立彩FANCY","大漁樂芙","睦唐大隱德芳","立新大樓","東城苑透天","東城苑4","臣富-鼎琉","富宇地產東城段案","懷洛宇建設大峰段案(尚未取得建照)"],"v":["昂峰馥築","立彩FANCY","大漁樂芙","睦唐大隱德芳","富宇地產東城段案","懷洛宇建設大峰段案(尚未取得建照)"]},"台中市|梧棲區":{"a":["昌祐U City","聯悦馨","喬立I DO","遠雄幸福成","佳鋐首耀","富宇富嶼","松濤硯1章","松濤硯2章","聖揚晴空2","仁里晴美","藍圖UNI","荷園二十期","立坤圓滿","宏觀帝堡","禾立興梧同墅","晴山寓所","荷園二十一期","雲頂金鑽3","佳格聚晴山","忠孝首席","好宅緻美","萬事如邑","拾壹墅","佳美城肯","御墅青安","ONE PLUS 昇祐智慧商辦大樓","敦悅III","日沐亦景","新竣初耘","竣吉大心2","民安易境","竣吉大心3-透天","澄灃藏臻","中央親鄰","太聚曜美II期","品德大仁24","輝堡大德","立東營建機構南簡段案(未取得建照)","協勝港心","勝興豐川","世紀雄偉5","中央園邸","德光仰境","朗境2","僑邑建設庄北段案","亞太之星","勝麗天廈","川平蘊川","井上森2","品德大仁18"],"v":["昌祐U City","聯悦馨","喬立I DO","佳鋐首耀","富宇富嶼","禾立興梧同墅","好宅緻美","中央親鄰","輝堡大德","勝興豐川","僑邑建設庄北段案","勝麗天廈","川平蘊川"]},"台中市|北區":{"a":["晴花嶼","長安大序","亞昕丰山","太睿興","老佛爺","禾岳建築与詩","梧桐蒔穗","科博1+1","元心中友湛","GREEN ONE","恆碩益華墅","元心富中山","達麗冶翠","寶御豐盛Ⅱ","述科博Ⅱ","盛承文匯","M寓所","興富安嘉"],"v":["長安大序","亞昕丰山","老佛爺","元心中友湛","達麗冶翠","述科博Ⅱ","M寓所"]},"台中市|外埔區":{"a":["權安好境","誠真禮墅","世紀花園30","巨匠傳承2-透天","巨匠傳承2-華廈","展裕榮耀","帝堡NO.35-華廈","立東美美","世紀花園27華廈","君品9寵愛菁櫻","帝堡NO.35-透天","幸福の園邸-A&B區","世紀花園31","皇品天悅","茂居吉鑽后科","世紀花園27透天"],"v":["帝堡NO.35-華廈","世紀花園31"]},"台中市|烏日區":{"a":["旺聖豪景","大華縱橫","坤聯富閱上境","翔生安築","總太V1","穩喬東園墅","新高鐵","臻鑫城隱6期","櫻花大綻","高鐵心綠都","巨陽森昇活","鼎川縱橫天厦","岩城金鑽","風禾日麗","櫻花心綻","成都營造新喀哩段案","鵬程建設新三和段案"],"v":["大華縱橫","坤聯富閱上境","新高鐵","櫻花大綻","巨陽森昇活","鼎川縱橫天厦","櫻花心綻","成都營造新喀哩段案","鵬程建設新三和段案"]}}};
 // 縣市名稱正規化（台/臺互換）
 function normCounty(c){return[c,c.replace(/^台/,'臺'),c.replace(/^臺/,'台')]}
 // Check if a district is in agent's territory. Returns true/false/null (null=no mapping)
@@ -960,6 +964,7 @@ function renderPen(){
   const obd=buildOBD(onlineMap),vbd=buildOBD(valuableMap),obc=buildOBC(obd),cbc=buildCBC(recs),td=buildTD(recs);
   document.getElementById('view-pen-ag').innerHTML=penAgTable(td,allCoop,obd,vbd);
   document.getElementById('view-pen-cn').innerHTML=penCnTable(obc,obd,vbd,cbc,allCoop);
+  document.getElementById('view-pen-b3').innerHTML=renderB3Table(td);
   updatePenCount()
 }
 function penAgTable(td,allCoop,obd,vbd){
@@ -1000,6 +1005,69 @@ function penAgTable(td,allCoop,obd,vbd){
     }
   }
   return penTW('\u5206\u7d44',rows)
+}
+// ── 業三組專屬滲透率（分母來自 B3_ONLINE Excel 清單）──
+const B3_AGENTS=['曾家羚','陳琬臻','呂佩宜'];
+function b3OnlineSets(ag){
+  const all=new Set(),val=new Set();
+  for(const{a,v}of Object.values(B3_ONLINE[ag]||{})){for(const p of a)all.add(p);for(const p of v)val.add(p)}
+  return{all,val}
+}
+function b3DistOnlineSets(ag,dk){
+  const d=B3_ONLINE[ag]?.[dk];
+  if(!d)return{all:new Set(),val:new Set()};
+  return{all:new Set(d.a),val:new Set(d.v)}
+}
+function b3AgCoopProj(td,ag){
+  const s=new Set();
+  for(const tm of Object.values(td)){if(tm.agents[ag])for(const p of tm.agents[ag].projects)s.add(p)}
+  return s
+}
+function b3DistCoopProj(td,ag,dk){
+  const s=new Set();
+  for(const tm of Object.values(td)){const d=tm.agents[ag]?.districts[dk];if(d)for(const p of d.projects)s.add(p)}
+  return s
+}
+function b3TotalRow(cs,os,vs){
+  const{csv,csn}=splitCoop(cs);
+  const cvk=storeNames(csv),cnk=storeNames(csn),ck=storeNames(cs),ok=storeNames(os),vk=storeNames(vs);
+  return`<tr class="r-total"><td>業三組合計</td><td style="color:#7c3aed">${nc(csv.size,cvk,'業三組 有價值合作','coop')}</td><td>${nc(csn.size,cnk,'業三組 無價值合作','coop')}</td><td>${nc(cs.size,ck,'業三組 合作','coop')}</td><td class="sep-col">${vc(vs.size,vk,'業三組 有價值在線')}</td><td>${valBadge(csv.size,vs.size)}</td><td class="sep-col">${nc(os.size,ok,'業三組 在線','online')}</td><td>${badge(cs.size,os.size)}</td></tr>`
+}
+function b3AgRow(id,l,cs,os,vs){
+  const{csv,csn}=splitCoop(cs);
+  const cvk=storeNames(csv),cnk=storeNames(csn),ck=storeNames(cs),ok=storeNames(os),vk=storeNames(vs);
+  return`<tr class="r-lv0" id="row_${id}" onclick="toggle('${id}')"><td><span class="toggle">▶</span>${l}</td><td style="color:#7c3aed">${nc(csv.size,cvk,l+' 有價值合作','coop')}</td><td>${nc(csn.size,cnk,l+' 無價值合作','coop')}</td><td>${nc(cs.size,ck,l+' 合作','coop')}</td><td class="sep-col">${vc(vs.size,vk,l+' 有價值在線')}</td><td>${valBarBadge(csv.size,vs.size)}</td><td class="sep-col">${nc(os.size,ok,l+' 在線','online')}</td><td>${barBadge(cs.size,os.size)}</td></tr>`
+}
+function b3DistRow(pid,l,cs,os,vs){
+  const{csv,csn}=splitCoop(cs);
+  const cvk=storeNames(csv),cnk=storeNames(csn),ck=storeNames(cs),ok=storeNames(os),vk=storeNames(vs);
+  return`<tr class="r-lv1 hidden" data-p="${pid}"><td>${l}</td><td style="color:#7c3aed">${nc(csv.size,cvk,l+' 有價值合作','coop')}</td><td>${nc(csn.size,cnk,l+' 無價值合作','coop')}</td><td>${nc(cs.size,ck,l+' 合作','coop')}</td><td class="sep-col">${vc(vs.size,vk,l+' 有價值在線')}</td><td>${vs.size?valBarBadge(csv.size,vs.size):'<span class="badge-none">-</span>'}</td><td class="sep-col">${nc(os.size,ok,l+' 在線','online')}</td><td>${os.size?barBadge(cs.size,os.size):'<span class="badge-none">-</span>'}</td></tr>`
+}
+function renderB3Table(td){
+  // 計算總計：全體三人合計（在線建案去重合計）
+  const totCoopAll=new Set(),totOnlineAll=new Set(),totOnlineVal=new Set();
+  for(const ag of B3_AGENTS){
+    for(const p of b3AgCoopProj(td,ag))totCoopAll.add(p);
+    const{all,val}=b3OnlineSets(ag);
+    for(const p of all)totOnlineAll.add(p);
+    for(const p of val)totOnlineVal.add(p);
+  }
+  let rows=b3TotalRow(totCoopAll,totOnlineAll,totOnlineVal);
+  for(const ag of B3_AGENTS){
+    const aid='b3ag_'+sid(ag);
+    const agCoop=b3AgCoopProj(td,ag);
+    const{all:agOA,val:agOV}=b3OnlineSets(ag);
+    rows+=b3AgRow(aid,ag,agCoop,agOA,agOV);
+    // 行政區列（依在線建案數降冪）
+    const agData=B3_ONLINE[ag]||{};
+    const sortedDks=Object.entries(agData).sort((a,b)=>b[1].a.length-a[1].a.length);
+    for(const[dk,{a,v}]of sortedDks){
+      const p=dk.split('|');const lbl=[p[0],p[1]].filter(Boolean).join(' · ');
+      const distCoop=b3DistCoopProj(td,ag,dk);
+      rows+=b3DistRow(aid,lbl,distCoop,new Set(a),new Set(v));
+    }
+  }
+  return penTW('業務',rows)
 }
 function penCnTable(obc,obd,vbd,cbc,allCoop){
   let rows=penTR('全台合計',allCoop,new Set(onlineMap.keys()),new Set(valuableMap.keys()));
@@ -1205,10 +1273,10 @@ function unitCollapseAll(){document.querySelectorAll('#sec-unit .r-lv0,#sec-unit
 
 // \u2500\u2500 Feature / Dim switch \u2500\u2500
 function switchFeature(f){currentFeat=f;document.getElementById('sec-pen').style.display=f==='pen'?'':'none';document.getElementById('sec-unit').style.display=f==='unit'?'':'none';document.getElementById('sec-val').style.display=f==='val'?'':'none';document.getElementById('fb-pen').classList.toggle('active',f==='pen');document.getElementById('fb-unit').classList.toggle('active',f==='unit');document.getElementById('fb-val').classList.toggle('active',f==='val')}
-function switchPenDim(d){penDim=d;document.getElementById('view-pen-ag').style.display=d==='ag'?'':'none';document.getElementById('view-pen-cn').style.display=d==='cn'?'':'none';document.getElementById('tab-pen-ag').classList.toggle('active',d==='ag');document.getElementById('tab-pen-cn').classList.toggle('active',d==='cn');document.getElementById('pen-search').value='';updatePenCount()}
+function switchPenDim(d){penDim=d;document.getElementById('view-pen-ag').style.display=d==='ag'?'':'none';document.getElementById('view-pen-cn').style.display=d==='cn'?'':'none';document.getElementById('view-pen-b3').style.display=d==='b3'?'':'none';document.getElementById('tab-pen-ag').classList.toggle('active',d==='ag');document.getElementById('tab-pen-cn').classList.toggle('active',d==='cn');document.getElementById('tab-pen-b3').classList.toggle('active',d==='b3');document.getElementById('pen-search').value='';updatePenCount()}
 function switchUnitDim(d){unitDim=d;document.getElementById('view-unit-ag').style.display=d==='ag'?'':'none';document.getElementById('view-unit-cn').style.display=d==='cn'?'':'none';document.getElementById('tab-unit-ag').classList.toggle('active',d==='ag');document.getElementById('tab-unit-cn').classList.toggle('active',d==='cn');document.getElementById('unit-search').value='';updateUnitCount()}
 function switchValDim(d){valDim=d;document.getElementById('view-val-ag').style.display=d==='ag'?'':'none';document.getElementById('view-val-cn').style.display=d==='cn'?'':'none';document.getElementById('tab-val-ag').classList.toggle('active',d==='ag');document.getElementById('tab-val-cn').classList.toggle('active',d==='cn')}
-function updatePenCount(){const v=penDim==='ag'?'view-pen-ag':'view-pen-cn';document.getElementById('pen-count').textContent=`\u5171 ${document.querySelectorAll('#'+v+' .r-lv0').length} \u500b\u7fa4\u7d44`}
+function updatePenCount(){const v=penDim==='ag'?'view-pen-ag':(penDim==='b3'?'view-pen-b3':'view-pen-cn');const lbl=penDim==='b3'?'\u500b\u696d\u52d9':'\u500b\u7fa4\u7d44';document.getElementById('pen-count').textContent=`\u5171 ${document.querySelectorAll('#'+v+' .r-lv0').length} ${lbl}`}
 function updateUnitCount(){const v=unitDim==='ag'?'view-unit-ag':'view-unit-cn';document.getElementById('unit-count').textContent=`\u5171 ${document.querySelectorAll('#'+v+' .r-lv0').length} \u500b\u7fa4\u7d44`}
 
 // \u2500\u2500 Search \u2500\u2500
