@@ -342,7 +342,7 @@ function authLogout(){
           <button class="tool-btn info-btn" onclick="showInfoModal()" title="計算說明">？</button>
           <button class="tool-btn" onclick="penExpandAll()">全部展開</button>
           <button class="tool-btn" onclick="penCollapseAll()">全部摺疊</button>
-          <button class="tool-btn" onclick="downloadPenExcel()" title="下載業務維度滲透率明細">⬇ 下載 Excel</button>
+          <button class="tool-btn" onclick="downloadPenExcel()" title="下載當前維度滲透率明細（業務維度含負責區、縣市維度到行政區）">⬇ 下載 Excel</button>
         </div>
       </div>
       <div class="tw-wrap">
@@ -1242,30 +1242,64 @@ function downloadPenExcel(){
   const months=periodMonths(penPeriod);
   const baseRecs=getFilteredRaws();
   const recs=penPeriod==='all'?baseRecs:baseRecs.filter(r=>months.some(m=>r.monthly[m-1]>0));
-  const td=buildTD(recs);
+  const wb=XLSX.utils.book_new();
   const obd=buildOBD(onlineMap),vbd=buildOBD(valuableMap);
-  const headers=['分組','業務','縣市','行政區','合作(有價值)','合作(無價值)','合作總數','有價值在線建案數','有價值滲透率(%)','在線建案數(全部)','滲透率(全部)(%)'];
-  const rows=[headers];
-  for(const tm of sortTeams(td)){
-    const t=td[tm];
-    for(const[ag,ad]of Object.entries(t.agents).sort((a,b)=>b[1].projects.size-a[1].projects.size)){
-      const sortedDists=Object.entries(ad.districts).sort((a,b)=>b[1].projects.size-a[1].projects.size);
-      for(const[,di]of sortedDists){
-        if(isAgTerrDist(ag,di.county,di.district)===false)continue;
-        const{csv,csn}=splitCoop(di.projects);
-        const doL=dOP(di.county,di.district,obd);
-        const dvL=dOP(di.county,di.district,vbd);
-        const valRate=dvL.size?+(csv.size/dvL.size*100).toFixed(1):'';
-        const allRate=doL.size?+(di.projects.size/doL.size*100).toFixed(1):'';
-        rows.push([tm,ag,di.county||'',di.district||'',csv.size,csn.size,di.projects.size,dvL.size,valRate,doL.size,allRate]);
+  if(penDim==='cn'){
+    // 縣市維度：縣市 → 行政區（不含業務名字）
+    const obc=buildOBC(obd);
+    const cbc=buildCBC(recs);
+    const headers=['縣市','行政區','合作(有價值)','合作(無價值)','合作總數','有價值在線建案數','有價值滲透率(%)','在線建案數(全部)','滲透率(全部)(%)'];
+    const rows=[headers];
+    for(const county of sortCounties(Object.keys(obc))){
+      const cOL=new Set(),cVL=new Set();
+      for(const ns of Object.values(obd[county]||{}))ns.forEach(p=>cOL.add(p));
+      for(const ns of Object.values(vbd[county]||{}))ns.forEach(p=>cVL.add(p));
+      const cs_c=cbc[county]?.projects||new Set();
+      const{csv:csvC,csn:csnC}=splitCoop(cs_c);
+      const vrC=cVL.size?+(csvC.size/cVL.size*100).toFixed(1):'';
+      const arC=cOL.size?+(cs_c.size/cOL.size*100).toFixed(1):'';
+      rows.push([county,'（合計）',csvC.size,csnC.size,cs_c.size,cVL.size,vrC,cOL.size,arC]);
+      for(const[dist] of Object.entries(obc[county].districts).sort((a,b)=>b[1]-a[1])){
+        const doL=dOP(county,dist,obd);
+        const dvL=dOP(county,dist,vbd);
+        const cs_d=cbc[county]?.districts[dist]||new Set();
+        const{csv,csn}=splitCoop(cs_d);
+        const vr=dvL.size?+(csv.size/dvL.size*100).toFixed(1):'';
+        const ar=doL.size?+(cs_d.size/doL.size*100).toFixed(1):'';
+        rows.push([county,dist,csv.size,csn.size,cs_d.size,dvL.size,vr,doL.size,ar]);
       }
     }
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=[{wch:10},{wch:8},{wch:12},{wch:12},{wch:10},{wch:14},{wch:14},{wch:13},{wch:13}];
+    XLSX.utils.book_append_sheet(wb,ws,'滲透率明細');
+    XLSX.writeFile(wb,'滲透率明細_縣市維度.xlsx');
+  } else {
+    // 業務維度 or b3：分組 → 業務 → 行政區
+    const td=buildTD(recs);
+    const tkeys=penDim==='b3'?Object.keys(td).filter(k=>k==='業務三組'):Object.keys(td);
+    const filtTD=Object.fromEntries(tkeys.map(k=>[k,td[k]]));
+    const headers=['分組','業務','縣市','行政區','合作(有價值)','合作(無價值)','合作總數','有價值在線建案數','有價值滲透率(%)','在線建案數(全部)','滲透率(全部)(%)'];
+    const rows=[headers];
+    for(const tm of sortTeams(filtTD)){
+      const t=td[tm];
+      for(const[ag,ad]of Object.entries(t.agents).sort((a,b)=>b[1].projects.size-a[1].projects.size)){
+        const sortedDists=Object.entries(ad.districts).sort((a,b)=>b[1].projects.size-a[1].projects.size);
+        for(const[,di]of sortedDists){
+          if(isAgTerrDist(ag,di.county,di.district)===false)continue;
+          const{csv,csn}=splitCoop(di.projects);
+          const doL=dOP(di.county,di.district,obd);
+          const dvL=dOP(di.county,di.district,vbd);
+          const valRate=dvL.size?+(csv.size/dvL.size*100).toFixed(1):'';
+          const allRate=doL.size?+(di.projects.size/doL.size*100).toFixed(1):'';
+          rows.push([tm,ag,di.county||'',di.district||'',csv.size,csn.size,di.projects.size,dvL.size,valRate,doL.size,allRate]);
+        }
+      }
+    }
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=[{wch:12},{wch:8},{wch:8},{wch:8},{wch:12},{wch:12},{wch:10},{wch:14},{wch:14},{wch:13},{wch:13}];
+    XLSX.utils.book_append_sheet(wb,ws,'滲透率明細');
+    XLSX.writeFile(wb,penDim==='b3'?'滲透率明細_業三組.xlsx':'滲透率明細_業務維度.xlsx');
   }
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:12},{wch:8},{wch:8},{wch:8},{wch:12},{wch:12},{wch:10},{wch:14},{wch:14},{wch:13},{wch:13}];
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'滲透率明細');
-  XLSX.writeFile(wb,'滲透率明細.xlsx');
 }
 function downloadUnitExcel(){
   if(!cur25||!cur26)return;
