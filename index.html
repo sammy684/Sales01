@@ -416,7 +416,7 @@ function authLogout(){
         <div style="display:flex;gap:6px">
           <button class="tool-btn" onclick="unitExpandAll()">全部展開</button>
           <button class="tool-btn" onclick="unitCollapseAll()">全部摺疊</button>
-          <button class="tool-btn" onclick="downloadUnitExcel()" title="下載業務維度客單價明細">⬇ 下載 Excel</button>
+          <button class="tool-btn" onclick="downloadUnitExcel()" title="下載當前維度+時間+篩選的客單價明細">⬇ 下載 Excel</button>
         </div>
       </div>
       <div class="tw-wrap">
@@ -1269,34 +1269,61 @@ function downloadPenExcel(){
 }
 function downloadUnitExcel(){
   if(!cur25||!cur26)return;
-  const headers=['分組','業務','縣市','行政區','25合作數','25年業績','25客單價','26合作數','26年業績','26客單價','成長率(%)'];
-  const rows=[headers];
-  const allAg=new Set([...Object.keys(cur25.agents),...Object.keys(cur26.agents)]);
-  const ta={};for(const ag of allAg){const tm=cur26.agents[ag]?.team||cur25.agents[ag]?.team||'(未分組)';if(!ta[tm])ta[tm]=new Set();ta[tm].add(ag)}
-  for(const tm of sortTeams(ta)){
-    for(const ag of [...ta[tm]].sort((a,b)=>(cur26.agents[b]?.n||0)-(cur26.agents[a]?.n||0))){
-      const a26=cur26.agents[ag]||{n:0,rev:0,PR:{},districts:{}};
-      const allDks=new Set([...Object.keys(DATA_2025_PROJ[ag]||{}),...Object.keys(a26.districts)]);
-      const sortedDks=[...allDks].sort((x,y)=>(a26.districts[y]?.n||0)-(a26.districts[x]?.n||0));
-      for(const dk of sortedDks){
-        const p=dk.split('|');const county=p[0]||'',district=p[1]||'';
-        if(isAgTerrDist(ag,county,district)===false)continue;
-        const dd25_pr=DATA_2025_PROJ[ag]?.[dk]||{};
-        const dd25_n=Object.keys(dd25_pr).length;
-        const dd25_r=Object.values(dd25_pr).reduce((s,v)=>s+v,0);
-        const dd26=a26.districts[dk]||{n:0,rev:0};
-        const p25u=dd25_n?Math.round(dd25_r/dd25_n):0;
-        const p26u=dd26.n?Math.round(dd26.rev/dd26.n):0;
-        const growthPct=(p25u&&p26u)?+((p26u-p25u)/p25u*100).toFixed(1):'';
-        rows.push([tm,ag,county,district,dd25_n,dd25_r,p25u,dd26.n,dd26.rev||0,p26u,growthPct]);
+  const dim=unitDim;
+  const wb=XLSX.utils.book_new();
+  if(dim==='ag'){
+    // 業務維度：分組 → 業務 → 行政區（只含負責區域）
+    const headers=['分組','業務','縣市','行政區','25合作數','25年業績','25客單價','26合作數','26年業績','26客單價','成長率(%)'];
+    const rows=[headers];
+    const allAg=new Set([...Object.keys(cur25.agents),...Object.keys(cur26.agents)]);
+    const ta={};for(const ag of allAg){const tm=cur26.agents[ag]?.team||cur25.agents[ag]?.team||'(未分組)';if(!ta[tm])ta[tm]=new Set();ta[tm].add(ag)}
+    for(const tm of sortTeams(ta)){
+      for(const ag of [...ta[tm]].sort((a,b)=>(cur26.agents[b]?.n||0)-(cur26.agents[a]?.n||0))){
+        const a25dks=cur25.agents[ag]?.districts||{};
+        const a26=cur26.agents[ag]||{n:0,rev:0,PR:{},districts:{}};
+        const allDks=new Set([...Object.keys(a25dks),...Object.keys(a26.districts)]);
+        const sortedDks=[...allDks].sort((x,y)=>(a26.districts[y]?.n||0)-(a26.districts[x]?.n||0));
+        for(const dk of sortedDks){
+          const p=dk.split('|');const county=p[0]||'',district=p[1]||'';
+          if(isAgTerrDist(ag,county,district)===false)continue;
+          const dd25=a25dks[dk]||{n:0,rev:0};
+          const dd26=a26.districts[dk]||{n:0,rev:0};
+          const p25u=dd25.n?Math.round(dd25.rev/dd25.n):0;
+          const p26u=dd26.n?Math.round(dd26.rev/dd26.n):0;
+          const growthPct=(p25u&&p26u)?+((p26u-p25u)/p25u*100).toFixed(1):'';
+          rows.push([tm,ag,county,district,dd25.n,dd25.rev||0,p25u,dd26.n,dd26.rev||0,p26u,growthPct]);
+        }
       }
     }
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=[{wch:12},{wch:8},{wch:8},{wch:8},{wch:10},{wch:14},{wch:12},{wch:10},{wch:14},{wch:12},{wch:10}];
+    XLSX.utils.book_append_sheet(wb,ws,'客單價明細');
+    XLSX.writeFile(wb,'客單價明細_業務維度.xlsx');
+  } else {
+    // 縣市維度：縣市 → 行政區
+    const headers=['縣市','行政區','25合作數','25年業績','25客單價','26合作數','26年業績','26客單價','成長率(%)'];
+    const rows=[headers];
+    const allC=new Set([...Object.keys(cur25.counties),...Object.keys(cur26.counties)]);
+    for(const county of sortCounties([...allC])){
+      const c25=cur25.counties[county]||{n:0,rev:0,districts:{}};
+      const c26=cur26.counties[county]||{n:0,rev:0,districts:{}};
+      const cp25=c25.n?Math.round(c25.rev/c25.n):0,cp26=c26.n?Math.round(c26.rev/c26.n):0;
+      const cgrowth=(cp25&&cp26)?+((cp26-cp25)/cp25*100).toFixed(1):'';
+      rows.push([county,'（合計）',c25.n,c25.rev||0,cp25,c26.n,c26.rev||0,cp26,cgrowth]);
+      const allD=new Set([...Object.keys(c25.districts||{}),...Object.keys(c26.districts||{})]);
+      for(const dist of [...allD].sort((x,y)=>(c26.districts[y]?.n||0)-(c26.districts[x]?.n||0))){
+        const dd25=c25.districts[dist]||{n:0,rev:0};
+        const dd26=c26.districts[dist]||{n:0,rev:0};
+        const dp25=dd25.n?Math.round(dd25.rev/dd25.n):0,dp26=dd26.n?Math.round(dd26.rev/dd26.n):0;
+        const dgrowth=(dp25&&dp26)?+((dp26-dp25)/dp25*100).toFixed(1):'';
+        rows.push([county,dist,dd25.n,dd25.rev||0,dp25,dd26.n,dd26.rev||0,dp26,dgrowth]);
+      }
+    }
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=[{wch:10},{wch:8},{wch:10},{wch:14},{wch:12},{wch:10},{wch:14},{wch:12},{wch:10}];
+    XLSX.utils.book_append_sheet(wb,ws,'客單價明細');
+    XLSX.writeFile(wb,'客單價明細_縣市維度.xlsx');
   }
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:12},{wch:8},{wch:8},{wch:8},{wch:10},{wch:14},{wch:12},{wch:10},{wch:14},{wch:12},{wch:10}];
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'客單價明細');
-  XLSX.writeFile(wb,'客單價明細.xlsx');
 }
 function penExpandAll(){document.querySelectorAll('#sec-pen .r-lv0,#sec-pen .r-lv1.expandable').forEach(r=>{const id=r.id?.replace('row_','');if(!id)return;r.classList.add('open');document.querySelectorAll(`[data-p="${id}"]`).forEach(c=>c.classList.remove('hidden'))})}
 function penCollapseAll(){document.querySelectorAll('#sec-pen .r-lv0,#sec-pen .r-lv1.expandable').forEach(r=>r.classList.remove('open'));document.querySelectorAll('#sec-pen .r-lv1,#sec-pen .r-lv2').forEach(c=>c.classList.add('hidden'))}
